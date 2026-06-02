@@ -1578,7 +1578,7 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <p style="font-size:.83rem;color:#555;margin-bottom:12px">Registra una falta para notificar al padre de familia.</p>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div><label>👤 Alumno</label>
-        <select id="rep-alumno-d" style="max-width:320px"><option value="">– Seleccionar –</option></select>
+        <select id="rep-alumno-d" style="max-width:320px" onchange="renderListaReportes()"><option value="">– Seleccionar –</option></select>
       </div>
       <div><label>📅 Fecha</label>
         <input type="text" id="rep-fecha-d" readonly style="max-width:160px">
@@ -1590,6 +1590,12 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     </div>
     <div id="al-rep-d" style="margin-top:8px"></div>
     <button class="btn bro" onclick="_guardarRep('rep-alumno-d','rep-texto-d','al-rep-d')" style="margin-top:10px">📋 Guardar Reporte</button>
+  </div>
+
+  <!-- Lista de reportes del alumno seleccionado -->
+  <div class="card" id="card-lista-reportes" style="display:none">
+    <h2>🗑️ Reportes registrados</h2>
+    <div id="lista-reportes-alumno"></div>
   </div>
 </div>
 
@@ -1797,6 +1803,16 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <h2>📊 Resumen del Grupo</h2>
     <p style="font-size:.83rem;color:#555;margin-bottom:12px">Puntos acumulados durante el ciclo escolar.</p>
     <div id="recon-resumen"></div>
+  </div>
+
+  <!-- Gestionar / Borrar puntos individuales -->
+  <div class="card" style="border:2px solid #e0e0e0">
+    <h2>🗑️ Eliminar puntos individuales</h2>
+    <p style="font-size:.83rem;color:#555;margin-bottom:12px">Selecciona un alumno para ver y eliminar sus puntos de crecimiento o atención.</p>
+    <select id="gest-puntos-alumno" style="max-width:320px;margin-bottom:12px" onchange="renderGestPuntos()">
+      <option value="">– Seleccionar alumno –</option>
+    </select>
+    <div id="gest-puntos-lista"></div>
   </div>
 
 </div>
@@ -2359,7 +2375,7 @@ function renderBimGrid(){
 // ═══════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════
-const PASS = "maestro2025";
+const PASS = "Lima1980.";
 
 // Helper global: lee nota en formato nuevo {nota,fecha} o número simple
 let alumnoActualId = null;
@@ -4442,6 +4458,7 @@ function initSecRecon(){
     }
   });
   renderReconResumen();
+  initGestPuntosSelect();
 }
 
 function verCertificado(){
@@ -4588,6 +4605,7 @@ function initSecRep(){
     ALUMNOS.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=`${a.em} ${a.n}`; sa.appendChild(o); });
   }
   renderReconResumen();
+  renderListaReportes();
 }
 
 function renderCondGrid(){
@@ -5884,6 +5902,152 @@ showSection = function(n, btn){
   _origShowSection(n, btn);
   if(n === 'honor') renderCuadroHonor();
 };
+
+// ═══════════════════════════════════════════════
+// BORRAR REPORTES INDIVIDUALES
+// ═══════════════════════════════════════════════
+function renderListaReportes(){
+  const alId = document.getElementById('rep-alumno-d')?.value;
+  const card  = document.getElementById('card-lista-reportes');
+  const cont  = document.getElementById('lista-reportes-alumno');
+  if(!card || !cont) return;
+  if(!alId){ card.style.display='none'; cont.innerHTML=''; return; }
+
+  const reps  = getReportes();
+  const lista = reps[alId] || [];
+  card.style.display = 'block';
+
+  if(!lista.length){
+    cont.innerHTML='<div style="color:#aaa;text-align:center;padding:14px;font-size:.85rem">✅ Este alumno no tiene reportes registrados.</div>';
+    return;
+  }
+
+  const al = ALUMNOS.find(a=>a.id==alId);
+  let html = `<div style="font-family:'Baloo 2',cursive;font-weight:800;color:#c62828;margin-bottom:10px;font-size:.9rem">
+    ${al?al.em+' '+al.av:''} — ${lista.length} reporte(s)
+    <button class="btn bro" onclick="borrarTodosReportes(${alId})" style="font-size:.72rem;padding:4px 12px;margin-left:10px">🗑️ Borrar todos</button>
+  </div>`;
+
+  lista.slice().reverse().forEach((r, idxRev)=>{
+    const idx = lista.length - 1 - idxRev;
+    html += `<div style="display:flex;align-items:flex-start;gap:10px;background:#fff8f8;border:1.5px solid #ef9a9a;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+      <div style="flex:1">
+        <div style="font-size:.72rem;color:#c62828;font-weight:700;margin-bottom:2px">📅 ${r.fecha}</div>
+        <div style="font-size:.84rem;color:#1a2332">${r.texto}</div>
+      </div>
+      <button onclick="borrarReporte(${alId},${idx})" style="background:#c62828;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.78rem;flex-shrink:0;font-family:'Baloo 2',cursive;font-weight:700">🗑️ Borrar</button>
+    </div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function borrarReporte(alId, idx){
+  const reps = getReportes();
+  if(!reps[alId]) return;
+  reps[alId].splice(idx, 1);
+  if(reps[alId].length === 0) delete reps[alId];
+  setReportes(reps);
+  renderListaReportes();
+  renderAvatarGrid();
+}
+
+function borrarTodosReportes(alId){
+  const reps = getReportes();
+  delete reps[alId];
+  setReportes(reps);
+  renderListaReportes();
+  renderAvatarGrid();
+}
+
+// ═══════════════════════════════════════════════
+// BORRAR PUNTOS DE RECONOCIMIENTO INDIVIDUALES
+// ═══════════════════════════════════════════════
+function initGestPuntosSelect(){
+  const sel = document.getElementById('gest-puntos-alumno');
+  if(!sel || sel.options.length > 1) return;
+  ALUMNOS.forEach(a=>{
+    const o=document.createElement('option'); o.value=a.id; o.textContent=`${a.em} ${a.n}`; sel.appendChild(o);
+  });
+}
+
+function renderGestPuntos(){
+  const alId = document.getElementById('gest-puntos-alumno')?.value;
+  const cont  = document.getElementById('gest-puntos-lista');
+  if(!cont) return;
+  if(!alId){ cont.innerHTML=''; return; }
+
+  const puntos = getPuntos();
+  const data   = puntos[alId] || {crec:[], aten:[]};
+  const crec   = data.crec || [];
+  const aten   = data.aten || [];
+
+  if(!crec.length && !aten.length){
+    cont.innerHTML='<div style="color:#aaa;text-align:center;padding:14px;font-size:.85rem">✅ Este alumno no tiene puntos registrados.</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Puntos de crecimiento
+  if(crec.length){
+    html += `<div style="font-family:'Baloo 2',cursive;font-weight:800;color:#1b5e20;font-size:.9rem;margin-bottom:8px">
+      ⭐ Puntos de Crecimiento (${crec.length})
+      <button class="btn bv" onclick="borrarTodosPuntos(${alId},'crec')" style="font-size:.72rem;padding:4px 12px;margin-left:10px;background:#c62828">🗑️ Borrar todos</button>
+    </div>`;
+    crec.slice().reverse().forEach((r, idxRev)=>{
+      const idx = crec.length - 1 - idxRev;
+      html += `<div style="display:flex;align-items:flex-start;gap:10px;background:#f1f8e9;border:1.5px solid #a5d6a7;border-radius:10px;padding:10px 14px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:.72rem;color:#558b2f;font-weight:700">📅 ${r.fecha} · ${r.tipo}</div>
+          ${r.texto?`<div style="font-size:.82rem;color:#33691e;margin-top:2px">${r.texto}</div>`:''}
+        </div>
+        <button onclick="borrarPunto(${alId},'crec',${idx})" style="background:#c62828;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.78rem;flex-shrink:0;font-family:'Baloo 2',cursive;font-weight:700">🗑️</button>
+      </div>`;
+    });
+  }
+
+  // Puntos de atención
+  if(aten.length){
+    html += `<div style="font-family:'Baloo 2',cursive;font-weight:800;color:#b71c1c;font-size:.9rem;margin:12px 0 8px">
+      ⚠️ Puntos de Atención (${aten.length})
+      <button class="btn bro" onclick="borrarTodosPuntos(${alId},'aten')" style="font-size:.72rem;padding:4px 12px;margin-left:10px">🗑️ Borrar todos</button>
+    </div>`;
+    aten.slice().reverse().forEach((r, idxRev)=>{
+      const idx = aten.length - 1 - idxRev;
+      html += `<div style="display:flex;align-items:flex-start;gap:10px;background:#fff8f8;border:1.5px solid #ef9a9a;border-radius:10px;padding:10px 14px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:.72rem;color:#c62828;font-weight:700">📅 ${r.fecha} · ${r.tipo}</div>
+          ${r.texto?`<div style="font-size:.82rem;color:#c62828;margin-top:2px">${r.texto}</div>`:''}
+        </div>
+        <button onclick="borrarPunto(${alId},'aten',${idx})" style="background:#c62828;color:#fff;border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.78rem;flex-shrink:0;font-family:'Baloo 2',cursive;font-weight:700">🗑️</button>
+      </div>`;
+    });
+  }
+
+  cont.innerHTML = html;
+}
+
+function borrarPunto(alId, tipo, idx){
+  const puntos = getPuntos();
+  if(!puntos[alId] || !puntos[alId][tipo]) return;
+  puntos[alId][tipo].splice(idx, 1);
+  if(!puntos[alId].crec?.length && !puntos[alId].aten?.length) delete puntos[alId];
+  setPuntos(puntos);
+  renderGestPuntos();
+  renderReconResumen();
+  renderAvatarGrid();
+}
+
+function borrarTodosPuntos(alId, tipo){
+  const puntos = getPuntos();
+  if(!puntos[alId]) return;
+  puntos[alId][tipo] = [];
+  if(!puntos[alId].crec?.length && !puntos[alId].aten?.length) delete puntos[alId];
+  setPuntos(puntos);
+  renderGestPuntos();
+  renderReconResumen();
+  renderAvatarGrid();
+}
 
 
 
