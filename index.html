@@ -1319,6 +1319,9 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
       <button class="btn baz" onclick="exportarABoleta()" style="font-size:.75rem;padding:6px 14px;margin-left:8px">
         📋 Exportar notas a la Boleta
       </button>
+      <button class="btn bro" onclick="recalcularBoletaDesdeRegistro()" style="font-size:.75rem;padding:6px 14px;margin-left:8px" title="Recalcula todos los punteos de la boleta leyendo directamente del registro de actividades">
+        🔄 Recalcular Boleta
+      </button>
     </div>
     <div id="al-rank"></div>
   </div>
@@ -2382,7 +2385,9 @@ let alumnoActualId = null;
 function getNota(v){
   if(v===null||v===undefined||v==='') return null;
   if(typeof v==='object'&&v!==null) return Number(v.nota);
-  return Number(v);
+  const n = Number(v);
+  if(isNaN(n)) return null;
+  return n;
 }
 
 const MATERIAS = [
@@ -2465,6 +2470,8 @@ function initCuadernos(){
       if(!_cuadernos[m].actividades){ _cuadernos[m].actividades=[]; changed=true; }
     });
     if(changed) db.ref(`cuadernos_${bimestreActivo}`).set(_cuadernos);
+    // Sincronizar siempre con localStorage para que recalcularBoleta lea datos frescos
+    localStorage.setItem(`cuadernos_${bimestreActivo}`, JSON.stringify(_cuadernos));
 
     if(!_fbListo){
       _fbListo = true;
@@ -4131,7 +4138,9 @@ async function exportarABoleta(silencioso=false){
     studentsLocal.push({ nombre:'', notas: Array.from({length:4},()=>Array(8).fill('')), valores: Array.from({length:4},()=>Array(8).fill('')) });
   }
 
-  const cuadernos = getCuadernos();
+  // Leer directamente del localStorage del bimestre activo (más confiable que _cuadernos en memoria)
+  const cuadRaw = localStorage.getItem(`cuadernos_${bimId}`);
+  const cuadernos = cuadRaw ? JSON.parse(cuadRaw) : getCuadernos();
   const conductas = getConductas();
   let actualizados = 0;
 
@@ -4939,8 +4948,8 @@ function mostrarBoleta(sec){
   const el = document.getElementById('sec-'+sec);
   if(el){el.style.display='block';el.classList.add('activo');}
 
-  // Sync boleta students with current Firebase data before showing
-  sincronizarBoletaConRegistro();
+  // Recalcular todos los bimestres desde el registro antes de mostrar
+  recalcularBoletaDesdeRegistro(true); // true = silencioso
 
   if(sec==='boleta'){
     const sel = document.getElementById('sel-alumno');
@@ -5904,8 +5913,69 @@ showSection = function(n, btn){
 };
 
 // ═══════════════════════════════════════════════
-// BORRAR REPORTES INDIVIDUALES
+// RECALCULAR BOLETA DESDE REGISTRO (fuerza re-lectura de todos los bimestres)
 // ═══════════════════════════════════════════════
+function recalcularBoletaDesdeRegistro(silencioso=false){
+  const bimestres = ['B1','B2','B3','B4'];
+  let boletaRaw = localStorage.getItem('boleta_v26');
+  let studentsLocal = boletaRaw ? JSON.parse(boletaRaw) : [];
+  while(studentsLocal.length < 40){
+    studentsLocal.push({ nombre:'', notas: Array.from({length:4},()=>Array(8).fill('')), valores: Array.from({length:4},()=>Array(8).fill('')) });
+  }
+
+  bimestres.forEach(bimId => {
+    const unidad = MAPA_UNIDAD[bimId];
+    if(unidad === undefined) return;
+
+    // Para el bimestre activo usar _cuadernos (datos en memoria, más frescos)
+    // Para otros bimestres leer del localStorage
+    let cuadernos;
+    if(bimId === bimestreActivo){
+      cuadernos = _cuadernos;
+    } else {
+      const cuadRaw = localStorage.getItem(`cuadernos_${bimId}`);
+      if(!cuadRaw) return;
+      cuadernos = JSON.parse(cuadRaw);
+    }
+
+    const condRaw = localStorage.getItem(`conductas_${bimId}`);
+    const conductas = condRaw ? JSON.parse(condRaw) : {};
+
+    ALUMNOS.forEach((al, idx) => {
+      if(!studentsLocal[idx]) studentsLocal[idx] = { nombre:'', notas: Array.from({length:4},()=>Array(8).fill('')), valores: Array.from({length:4},()=>Array(8).fill('')) };
+      if(!studentsLocal[idx].notas) studentsLocal[idx].notas = Array.from({length:4},()=>Array(8).fill(''));
+      if(!studentsLocal[idx].notas[unidad]) studentsLocal[idx].notas[unidad] = Array(8).fill('');
+      if(!studentsLocal[idx].valores) studentsLocal[idx].valores = Array.from({length:4},()=>Array(8).fill(''));
+      if(!studentsLocal[idx].valores[unidad]) studentsLocal[idx].valores[unidad] = Array(8).fill('');
+      studentsLocal[idx].nombre = al.n;
+
+      Object.entries(MAPA_BOLETA).forEach(([mat, idxArea]) => {
+        const datos = cuadernos[mat] || {actividades:[], notas:{}};
+        const acts  = datos.actividades || [];
+        let suma=0, con=0;
+        acts.forEach((_,i) => {
+          const v = getNota(datos.notas[`${al.id}_${i}`]);
+          if(v !== null){ suma += v; con++; }
+        });
+        if(con > 0) studentsLocal[idx].notas[unidad][idxArea] = String(suma);
+      });
+
+      // Conducta
+      const condKey = `${al.id}_U${unidad+1}`;
+      const condData = conductas[condKey] || {};
+      ASPECTOS.forEach((asp, aspIdx) => {
+        if(condData[asp]) studentsLocal[idx].valores[unidad][aspIdx] = condData[asp];
+      });
+    });
+  });
+
+  localStorage.setItem('boleta_v26', JSON.stringify(studentsLocal));
+  // Actualizar el array global students directamente en memoria
+  if(typeof students !== 'undefined'){
+    students.splice(0, students.length, ...studentsLocal);
+  }
+  if(!silencioso) mostrarAl('rank', '✅ Boleta recalculada correctamente desde el registro de actividades.', 'ok');
+}
 function renderListaReportes(){
   const alId = document.getElementById('rep-alumno-d')?.value;
   const card  = document.getElementById('card-lista-reportes');
