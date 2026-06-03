@@ -4993,7 +4993,7 @@ function sincronizarBoletaConRegistro(){
       let suma=0, con=0;
       acts.forEach((_,i)=>{
         const v = getNota(datos.notas[`${al.id}_${i}`]);
-        if(v!==null && v>0){ suma+=v; con++; }
+        if(v!==null){ suma+=v; con++; }
       });
       if(con>0) students[idx].notas[unidad][idxArea] = String(suma);
     });
