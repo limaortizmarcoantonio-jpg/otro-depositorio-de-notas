@@ -1279,6 +1279,10 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <span class="m-ico">🌟</span>
     <span class="m-tit">Evaluación de Conducta</span>
   </button>
+  <button class="menu-btn mb-asis" style="background:linear-gradient(145deg,#01579b,#0288d1)" onclick="abrirPanelPass('asis',this)">
+    <span class="m-ico">🗓️</span>
+    <span class="m-tit">Asistencia</span>
+  </button>
   <button class="menu-btn" style="background:linear-gradient(145deg,#1b5e20,#43a047)" onclick="abrirPanelPass('recon',this)">
     <span class="m-ico">⭐</span>
     <span class="m-tit">Reconocimientos</span>
@@ -1620,6 +1624,53 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <div id="cond-grid-alumnos" style="display:flex;flex-direction:column;gap:10px"></div>
     <div id="al-cond-d" style="margin-top:8px"></div>
     <button class="btn bv" onclick="guardarCondGrid()" style="margin-top:14px;width:100%;padding:13px">💾 Guardar Evaluación de Conducta</button>
+  </div>
+</div>
+
+<!-- ══════ ASISTENCIA ══════ -->
+<div id="sec-asis" class="sec" style="display:none">
+  <div class="card">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <button id="asis-tab-diaria" class="asis-tab-btn activo" onclick="mostrarAsisTab('diaria')"
+        style="flex:1;min-width:160px;padding:11px;border-radius:10px;border:2px solid #0288d1;background:#0288d1;color:#fff;font-family:'Baloo 2',cursive;font-weight:700;cursor:pointer;font-size:.85rem">
+        📝 Pasar Lista
+      </button>
+      <button id="asis-tab-resumen" class="asis-tab-btn" onclick="mostrarAsisTab('resumen')"
+        style="flex:1;min-width:160px;padding:11px;border-radius:10px;border:2px solid #0288d1;background:#fff;color:#0288d1;font-family:'Baloo 2',cursive;font-weight:700;cursor:pointer;font-size:.85rem">
+        📊 Resumen Mensual
+      </button>
+    </div>
+
+    <!-- SUB-PESTAÑA: PASAR LISTA DIARIA -->
+    <div id="asis-diaria">
+      <h2>📝 Pasar Lista</h2>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
+        <div>
+          <label>📅 Fecha</label>
+          <input type="date" id="asis-fecha" onchange="renderAsisDiaria()" style="min-width:160px">
+        </div>
+        <button class="btn baz" onclick="marcarTodosPresentes()" style="padding:9px 14px;font-size:.78rem">✅ Marcar todos presentes</button>
+        <button class="btn baz" onclick="justificarDiaCompleto()" style="padding:9px 14px;font-size:.78rem;background:#6a1b9a;border-color:#6a1b9a;color:#fff">📌 Justificar día completo (capacitación/actividad)</button>
+      </div>
+      <div id="asis-banner-dia"></div>
+      <div id="asis-resumen-fecha" style="background:#e1f5fe;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.8rem"></div>
+      <div id="asis-lista-alumnos"></div>
+    </div>
+
+    <!-- SUB-PESTAÑA: RESUMEN MENSUAL -->
+    <div id="asis-resumen" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button id="asis-mes-prev" onclick="cambiarMesAsis(-1)" style="padding:8px 13px;border-radius:8px;border:2px solid #0288d1;background:#fff;color:#0288d1;font-weight:900;cursor:pointer;font-size:.9rem">‹</button>
+        <h2 id="asis-mes-titulo" style="margin:0;font-size:1.05rem;white-space:nowrap">📅 Mes</h2>
+        <button id="asis-mes-next" onclick="cambiarMesAsis(1)" style="padding:8px 13px;border-radius:8px;border:2px solid #0288d1;background:#fff;color:#0288d1;font-weight:900;cursor:pointer;font-size:.9rem">›</button>
+        <button class="btn baz" onclick="descargarAsistenciaPDF()" style="margin-left:auto;padding:10px 16px;font-size:.78rem;white-space:nowrap">⬇️ Descargar asistencia (PDF)</button>
+      </div>
+      <input type="text" id="asis-buscar" placeholder="🔎 Buscar estudiante..." oninput="renderAsisResumenMes()"
+        style="width:100%;padding:10px 14px;border-radius:10px;border:1.5px solid #dde3ea;margin-bottom:14px;font-family:'Baloo 2',cursive;box-sizing:border-box">
+      <p style="font-size:.72rem;color:#888;margin:-8px 0 10px">💡 Click en una celda para marcar: Presente ✔ → Ausente ✖ → Permiso P → Actividad A → vacío</p>
+      <div id="asis-resumen-mes-tabla"></div>
+      <div id="asis-resumen-permisos" style="margin-top:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -2308,6 +2359,21 @@ function initReportesFirebase(){
   });
 }
 
+// Asistencia — {"YYYY-MM-DD": {alumnoId: {estado:'P'|'A'|'permiso', razon}}}
+function getAsistencia(){ return JSON.parse(localStorage.getItem(`asistencia_${bimestreActivo}`)||'{}'); }
+function setAsistencia(d){
+  localStorage.setItem(`asistencia_${bimestreActivo}`, JSON.stringify(d));
+  db.ref(`asistencia_${bimestreActivo}`).set(d).catch(e=>console.error(e));
+}
+function initAsistenciaFirebase(){
+  if(!bimestreActivo) return;
+  db.ref(`asistencia_${bimestreActivo}`).on('value',snap=>{
+    const data = snap.val();
+    localStorage.setItem(`asistencia_${bimestreActivo}`, JSON.stringify(data||{}));
+    if(panelActivo==='asis'){ renderAsisDiaria(); renderAsisResumenMes(); }
+  });
+}
+
 function seleccionarBimestre(bimId){
   // Guardar promedios del bimestre actual antes de cambiar
   if(bimestreActivo) guardarPromediosBimestre(bimestreActivo);
@@ -2341,8 +2407,12 @@ function seleccionarBimestre(bimId){
   initCuadernos();
   initConductaFirebase();
   initReportesFirebase();
+  initAsistenciaFirebase();
   initPromediosFirebase();
   initPuntosFirebase();
+  // Traer notas reales de los OTROS bimestres desde Firebase, para que la boleta
+  // sume correctamente aunque no se haya guardado manualmente el promedio antes.
+  refrescarPromediosDeOtrosBimestres();
   // Mostrar menú de botones
   const grid = document.querySelector('.menu-grid');
   if(grid) grid.style.display='grid';
@@ -2378,7 +2448,10 @@ function renderBimGrid(){
 // ═══════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════
-const PASS = "Lima1980.";
+const PASS = "Lima1980";
+// Una vez que el maestro ingresa la contraseña correcta en cualquier sección,
+// el sistema queda desbloqueado para el resto de las pestañas (no se vuelve a pedir).
+let sesionDesbloqueada = false;
 
 // Helper global: lee nota en formato nuevo {nota,fecha} o número simple
 let alumnoActualId = null;
@@ -2398,6 +2471,7 @@ const MATERIAS = [
 
 const ALUMNOS = [
   {id:1, n:"Aldana Pérez José David",             av:"El Águila Real",          em:"🦅"},
+  {id:32,n:"Brenes Barrientos Daniel Isaías",     av:"El Mono Aullador",          em:"🐒"},
   {id:2, n:"Brenes Brenes Weslín Alessandro",     av:"El Jaguar Negro",          em:"🐆"},
   {id:3, n:"Cerrata Pérez Alan Ronaldo",          av:"La Guacamaya Roja",        em:"🦜"},
   {id:4, n:"Cervantes Bojorquez Jerry José Alejandro",av:"El Puma Plateado",    em:"🦁"},
@@ -2728,6 +2802,7 @@ const PANEL_COLORES = {
   bol :'linear-gradient(90deg,#880e4f,#c2185b)',
   rep :'linear-gradient(90deg,#7b1fa2,#9c27b0)',
   cond:'linear-gradient(90deg,#e65100,#ff6f00)',
+  asis:'linear-gradient(90deg,#01579b,#0288d1)',
   config:'linear-gradient(90deg,#263238,#455a64)',
   recon:'linear-gradient(90deg,#1b5e20,#43a047)',
 };
@@ -2740,11 +2815,12 @@ const PANEL_TITULOS = {
   bol :'📋 Boleta de Calificaciones',
   rep :'⚠️ Reporte Disciplinario',
   cond:'🌟 Evaluación de Conducta',
+  asis:'🗓️ Asistencia',
   config:'⚙️ Configuración',
   recon:'⭐ Reconocimientos y Puntos',
 };
 let panelActivo = null;
-const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','config','recon'];
+const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','config','recon'];
 
 function abrirPanel(sec, btn){
   if(panelActivo===sec){ cerrarPanel(); return; }
@@ -2773,6 +2849,7 @@ function abrirPanel(sec, btn){
   if(sec==='impr')   renderImprimible();
   if(sec==='rep')    initSecRep();
   if(sec==='cond')   renderCondGrid();
+  if(sec==='asis')   initAsistencia();
   if(sec==='bol')    setTimeout(()=>mostrarBoleta('imprimir'), 200);
   if(sec==='config') initConfig();
   if(sec==='recon')  initSecRecon();
@@ -2780,6 +2857,20 @@ function abrirPanel(sec, btn){
 
 function abrirPanelPass(sec, btn){
   if(panelActivo===sec){ cerrarPanel(); return; }
+  // Si ya se desbloqueó la sesión en cualquier otra pestaña, entrar directo sin pedir contraseña de nuevo
+  if(sesionDesbloqueada){
+    abrirPanel(sec, btn);
+    if(sec==='cuad') desbloquearCuad();
+    if(sec==='reg')  desbloquearReg();
+    if(sec==='impr') desbloquearImpr();
+    if(sec==='rep')  initSecRep();
+    if(sec==='cond') renderCondGrid();
+    if(sec==='asis') initAsistencia();
+    if(sec==='bol')  setTimeout(()=>mostrarBoleta('imprimir'), 200);
+    if(sec==='config') initConfig();
+    if(sec==='recon') initSecRecon();
+    return;
+  }
   // Pedir contraseña para todas las secciones protegidas
   pedirPassGenerico(sec, btn);
 }
@@ -2834,6 +2925,7 @@ function pedirPassGenerico(sec, btn){
 function chkPassGenerico(){
   const val = document.getElementById('modal-pass-inp') ? document.getElementById('modal-pass-inp').value : '';
   if(val === PASS){
+    sesionDesbloqueada = true;
     const p = window._panelPendiente; // Guardar ANTES de cerrar modal
     // Cerrar modal
     _destruirModalPass();
@@ -2847,6 +2939,11 @@ function chkPassGenerico(){
         if(p.sec==='bol')    setTimeout(()=>mostrarBoleta('imprimir'), 200);
         if(p.sec==='config') initConfig();
         if(p.sec==='recon')  initSecRecon();
+        // Estas secciones tienen su propia pantalla de login interna: al desbloquear
+        // la sesión, se abre directo sin pedir la contraseña una segunda vez.
+        if(p.sec==='cuad')   desbloquearCuad();
+        if(p.sec==='reg')    desbloquearReg();
+        if(p.sec==='impr')   desbloquearImpr();
       }, 50);
     }
   } else {
@@ -2862,25 +2959,31 @@ function cerrarModalPass(){
 // ── Contraseña para Cuaderno ──
 function pedirPassCuad(){
   abrirPanel('cuad', document.querySelector('.mb-cuad'));
+  if(sesionDesbloqueada) desbloquearCuad();
+}
+
+function desbloquearCuad(){
+  document.getElementById('login-cuad').style.display='none';
+  document.getElementById('cuad-simple').style.display='none';
+  document.getElementById('cuad-contenido').style.display='block';
+  initMovil();
+  initCondAlumnoSelect();
+  const hoy=new Date();
+  const fd=`${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+  ['rep-fecha','rep-fecha-b'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=fd; });
+  ['rep-alumno-b'].forEach(id=>{
+    const sa=document.getElementById(id);
+    if(sa && sa.options.length<2){
+      ALUMNOS.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=`${a.em} ${a.n}`; sa.appendChild(o); });
+    }
+  });
 }
 
 function chkPassCuad(){
   const val = document.getElementById('inp-pass-cuad') ? document.getElementById('inp-pass-cuad').value : '';
   if(val === PASS){
-    document.getElementById('login-cuad').style.display='none';
-    document.getElementById('cuad-simple').style.display='none';
-    document.getElementById('cuad-contenido').style.display='block';
-    initMovil();
-    initCondAlumnoSelect();
-    const hoy=new Date();
-    const fd=`${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
-    ['rep-fecha','rep-fecha-b'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=fd; });
-    ['rep-alumno-b'].forEach(id=>{
-      const sa=document.getElementById(id);
-      if(sa && sa.options.length<2){
-        ALUMNOS.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=`${a.em} ${a.n}`; sa.appendChild(o); });
-      }
-    });
+    sesionDesbloqueada = true;
+    desbloquearCuad();
   } else {
     document.getElementById('err-pass-cuad').textContent='❌ Contraseña incorrecta.';
   }
@@ -2889,19 +2992,32 @@ function chkPassCuad(){
 // ── Contraseña para Registro Interno ──
 function pedirPass(){
   abrirPanel('reg', document.querySelector('.mb-reg'));
+  if(sesionDesbloqueada) desbloquearReg();
+}
+
+function desbloquearReg(){
+  document.getElementById('login-pan').style.display='none';
+  document.getElementById('reg-pan').style.display='block';
+  renderResumen(); renderRegInt();
 }
 
 // ── Contraseña para Imprimir ──
 function pedirPassImpr(){
   abrirPanel('impr', document.querySelector('.mb-impr'));
+  if(sesionDesbloqueada) desbloquearImpr();
+}
+
+function desbloquearImpr(){
+  document.getElementById('login-impr').style.display='none';
+  document.getElementById('impr-contenido').style.display='block';
+  renderImprimible();
 }
 
 function chkPassImpr(){
   const val = document.getElementById('inp-pass-impr') ? document.getElementById('inp-pass-impr').value : '';
   if(val === PASS){
-    document.getElementById('login-impr').style.display='none';
-    document.getElementById('impr-contenido').style.display='block';
-    renderImprimible();
+    sesionDesbloqueada = true;
+    desbloquearImpr();
   } else {
     document.getElementById('err-pass-impr').textContent='❌ Contraseña incorrecta.';
   }
@@ -2993,9 +3109,8 @@ function renderReporteDia(){
 function chkPass(){
   const val = document.getElementById('inp-pass') ? document.getElementById('inp-pass').value : '';
   if(val === PASS){
-    document.getElementById('login-pan').style.display='none';
-    document.getElementById('reg-pan').style.display='block';
-    renderResumen(); renderRegInt();
+    sesionDesbloqueada = true;
+    desbloquearReg();
   } else { document.getElementById('err-pass').textContent='❌ Contraseña incorrecta.'; }
 }
 
@@ -4282,10 +4397,8 @@ function initPromediosFirebase(){
   });
 }
 
-function guardarPromediosBimestre(bimId){
-  // Calcula y guarda el promedio de cada alumno en el bimestre dado
-  if(!bimId) return;
-  const c = JSON.parse(localStorage.getItem(`cuadernos_${bimId}`)||'{}');
+function calcularPromedioDesdeCuadernos(c){
+  // Función pura: recibe un objeto "cuadernos" (notas por materia) y devuelve {alumnoId: promedio}
   const promedios = {};
   ALUMNOS.forEach(al=>{
     let suma=0, con=0;
@@ -4299,10 +4412,43 @@ function guardarPromediosBimestre(bimId){
     });
     if(con>0) promedios[al.id] = Math.round(suma/con);
   });
+  return promedios;
+}
+
+function guardarPromediosBimestre(bimId){
+  // Calcula y guarda el promedio de cada alumno en el bimestre dado (usando el caché local)
+  if(!bimId) return;
+  const c = JSON.parse(localStorage.getItem(`cuadernos_${bimId}`)||'{}');
+  const promedios = calcularPromedioDesdeCuadernos(c);
   if(!_promediosGuardados) _promediosGuardados = {};
   _promediosGuardados[bimId] = promedios;
   localStorage.setItem('promedios_bim', JSON.stringify(_promediosGuardados));
   db.ref('promedios_bim').set(_promediosGuardados).catch(e=>console.error(e));
+}
+
+// Trae de Firebase las notas REALES de los bimestres que no están activos ahora mismo,
+// y recalcula sus promedios. Esto evita que la boleta muestre datos viejos si el maestro
+// cerró la app sin guardar promedios manualmente en el bimestre anterior.
+async function refrescarPromediosDeOtrosBimestres(){
+  if(!_promediosGuardados) _promediosGuardados = {};
+  const pendientes = BIMESTRES.filter(b=>b.id!==bimestreActivo);
+  for(const b of pendientes){
+    try{
+      const snap = await db.ref(`cuadernos_${b.id}`).once('value');
+      const c = snap.val() || {};
+      const promedios = calcularPromedioDesdeCuadernos(c);
+      if(Object.keys(promedios).length>0){
+        _promediosGuardados[b.id] = promedios;
+      }
+    } catch(e){
+      console.error(`No se pudo refrescar el promedio de ${b.id}:`, e);
+    }
+  }
+  localStorage.setItem('promedios_bim', JSON.stringify(_promediosGuardados));
+  db.ref('promedios_bim').set(_promediosGuardados).catch(e=>console.error(e));
+  // Volver a pintar lo que dependa de estos promedios, si está a la vista
+  renderRanking();
+  if(panelActivo==='impr') renderImprimible();
 }
 
 function getPromedioGeneral(alId){
@@ -4690,6 +4836,347 @@ function selCondGridTable(sel, alId, unidad, aspecto){
     const completo = ASPECTOS.every(a=>getConductas()[`${alId}_${unidad}`]?.[a]);
     fila.style.borderLeft = completo ? '4px solid #81c784' : '4px solid #ffcc80';
   }
+}
+
+// ═══════════════════════════════════════════════
+// ASISTENCIA — CUADERNO DE ASISTENCIA
+// ═══════════════════════════════════════════════
+const MESES_BIM = {
+  B1: [0,1,2],   // Enero, Febrero, Marzo
+  B2: [3,4,5],   // Abril, Mayo, Junio
+  B3: [6,7,8],   // Julio, Agosto, Septiembre
+  B4: [9,10,11], // Octubre, Noviembre, Diciembre
+};
+const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function initAsistencia(){
+  const inp = document.getElementById('asis-fecha');
+  if(inp && !inp.value){
+    const hoy = new Date();
+    inp.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+  }
+  mostrarAsisTab('diaria');
+  renderAsisDiaria();
+  initAsisMesSelect();
+  renderAsisResumenMes();
+}
+function mostrarAsisTab(tab){
+  const dia = document.getElementById('asis-diaria');
+  const res = document.getElementById('asis-resumen');
+  const btnD = document.getElementById('asis-tab-diaria');
+  const btnR = document.getElementById('asis-tab-resumen');
+  if(dia) dia.style.display = tab==='diaria' ? 'block':'none';
+  if(res) res.style.display = tab==='resumen' ? 'block':'none';
+  [btnD,btnR].forEach(b=>{
+    if(!b) return;
+    const activo = (b.id==='asis-tab-'+tab);
+    b.style.background = activo ? '#0288d1' : '#fff';
+    b.style.color = activo ? '#fff' : '#0288d1';
+  });
+  if(tab==='resumen') renderAsisResumenMes();
+}
+
+function renderAsisDiaria(){
+  const fechaInp = document.getElementById('asis-fecha');
+  const cont = document.getElementById('asis-lista-alumnos');
+  if(!cont || !fechaInp || !fechaInp.value) return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  const dia = data[fecha]||{};
+  const motivoDia = dia._motivoDia || '';
+
+  let presentes=0, ausentes=0, permisos=0, actividad=0;
+  ALUMNOS.forEach(a=>{
+    const e = dia[a.id]?.estado;
+    if(e==='P') presentes++;
+    else if(e==='A') ausentes++;
+    else if(e==='permiso') permisos++;
+    else if(e==='ND') actividad++;
+  });
+  const sinMarcar = ALUMNOS.length - presentes - ausentes - permisos - actividad;
+  const resumenBar = document.getElementById('asis-resumen-fecha');
+  if(resumenBar){
+    resumenBar.innerHTML = `
+      <span style="color:#2e7d32;font-weight:700">✅ Presentes: ${presentes}</span>
+      <span style="color:#c62828;font-weight:700;margin-left:14px">❌ Ausentes: ${ausentes}</span>
+      <span style="color:#e65100;font-weight:700;margin-left:14px">📋 Permisos: ${permisos}</span>
+      <span style="color:#6a1b9a;font-weight:700;margin-left:14px">📌 Actividad: ${actividad}</span>
+      <span style="color:#607d8b;font-weight:700;margin-left:14px">⬜ Sin marcar: ${sinMarcar}</span>`;
+  }
+
+  // Banner de día justificado (capacitación, taller, actividad docente, etc.)
+  const bannerCont = document.getElementById('asis-banner-dia');
+  if(bannerCont){
+    if(motivoDia){
+      bannerCont.innerHTML = `<div style="background:#f3e5f5;border-left:4px solid #6a1b9a;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1.1rem">📌</span>
+        <span style="flex:1;min-width:200px;font-size:.82rem"><strong>Día justificado:</strong> ${motivoDia}</span>
+        <button type="button" onclick="quitarJustificacionDia()" style="padding:6px 12px;border-radius:8px;border:none;background:#6a1b9a;color:#fff;font-weight:700;font-size:.72rem;cursor:pointer;font-family:'Baloo 2',cursive">🗑️ Quitar justificación</button>
+      </div>`;
+    } else {
+      bannerCont.innerHTML = '';
+    }
+  }
+
+  let html='';
+  ALUMNOS.forEach((al,idx)=>{
+    const reg = dia[al.id]||{};
+    const estado = reg.estado||'';
+    const razon = (reg.razon||'').replace(/"/g,'&quot;');
+    const bg = idx%2===0 ? '#fafafa':'#fff';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${bg};border-radius:10px;margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-weight:700;flex:1;min-width:200px;color:#1a2332"><span style="font-size:1.1rem">${al.em}</span> ${al.n}</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" onclick="marcarAsistencia('${al.id}','P')"
+          style="padding:6px 12px;border-radius:8px;border:2px solid ${estado==='P'?'#2e7d32':'#dde3ea'};background:${estado==='P'?'#2e7d32':'#fff'};color:${estado==='P'?'#fff':'#555'};font-weight:700;font-size:.75rem;cursor:pointer;font-family:'Baloo 2',cursive">✅ Presente</button>
+        <button type="button" onclick="marcarAsistencia('${al.id}','A')"
+          style="padding:6px 12px;border-radius:8px;border:2px solid ${estado==='A'?'#c62828':'#dde3ea'};background:${estado==='A'?'#c62828':'#fff'};color:${estado==='A'?'#fff':'#555'};font-weight:700;font-size:.75rem;cursor:pointer;font-family:'Baloo 2',cursive">❌ Ausente</button>
+        <button type="button" onclick="marcarAsistencia('${al.id}','permiso')"
+          style="padding:6px 12px;border-radius:8px;border:2px solid ${estado==='permiso'?'#e65100':'#dde3ea'};background:${estado==='permiso'?'#e65100':'#fff'};color:${estado==='permiso'?'#fff':'#555'};font-weight:700;font-size:.75rem;cursor:pointer;font-family:'Baloo 2',cursive">📋 Permiso</button>
+        <button type="button" onclick="marcarAsistencia('${al.id}','ND')"
+          style="padding:6px 12px;border-radius:8px;border:2px solid ${estado==='ND'?'#6a1b9a':'#dde3ea'};background:${estado==='ND'?'#6a1b9a':'#fff'};color:${estado==='ND'?'#fff':'#555'};font-weight:700;font-size:.75rem;cursor:pointer;font-family:'Baloo 2',cursive">📌 Actividad</button>
+      </div>
+      ${(estado==='permiso'||estado==='ND') ? `<input type="text" placeholder="${estado==='ND'?'Motivo de la actividad/capacitación...':'Razón del permiso...'}" value="${razon}"
+        onchange="guardarRazonPermiso('${al.id}', this.value)"
+        style="flex:2;min-width:200px;padding:6px 10px;border-radius:8px;border:1.5px solid ${estado==='ND'?'#ce93d8':'#ffcc80'};font-family:'Baloo 2',cursive">` : ''}
+    </div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function marcarAsistencia(alId, estado){
+  const fechaInp = document.getElementById('asis-fecha');
+  if(!fechaInp || !fechaInp.value) return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  if(!data[fecha]) data[fecha]={};
+  const actual = data[fecha][alId]?.estado;
+  if(actual===estado){
+    // Volver a pulsar el mismo estado lo desmarca
+    delete data[fecha][alId];
+  } else {
+    const razonPrev = data[fecha][alId]?.razon||'';
+    data[fecha][alId] = (estado==='permiso'||estado==='ND') ? {estado, razon:razonPrev} : {estado};
+  }
+  setAsistencia(data);
+  renderAsisDiaria();
+}
+
+function guardarRazonPermiso(alId, razon){
+  const fechaInp = document.getElementById('asis-fecha');
+  if(!fechaInp || !fechaInp.value) return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  if(!data[fecha]) data[fecha]={};
+  if(!data[fecha][alId]) data[fecha][alId]={estado:'permiso'};
+  data[fecha][alId].razon = razon.trim();
+  setAsistencia(data);
+}
+
+function marcarTodosPresentes(){
+  const fechaInp = document.getElementById('asis-fecha');
+  if(!fechaInp || !fechaInp.value) return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  if(!data[fecha]) data[fecha]={};
+  ALUMNOS.forEach(a=>{ data[fecha][a.id] = {estado:'P'}; });
+  delete data[fecha]._motivoDia;
+  setAsistencia(data);
+  renderAsisDiaria();
+}
+
+// Justificar el día completo: para capacitaciones, talleres o actividades donde
+// el docente no puede pasar lista. Coloca el motivo en toda la fila (los 32 estudiantes)
+// para que no quede en blanco frente a una autoridad educativa.
+function justificarDiaCompleto(){
+  const fechaInp = document.getElementById('asis-fecha');
+  if(!fechaInp || !fechaInp.value){ alert('Selecciona primero una fecha.'); return; }
+  const motivo = prompt('Motivo de la actividad/capacitación (se aplicará a los 32 estudiantes en esta fecha):', '');
+  if(motivo===null || motivo.trim()==='') return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  data[fecha] = {};
+  ALUMNOS.forEach(a=>{ data[fecha][a.id] = {estado:'ND', razon: motivo.trim()}; });
+  data[fecha]._motivoDia = motivo.trim();
+  setAsistencia(data);
+  renderAsisDiaria();
+}
+
+function quitarJustificacionDia(){
+  const fechaInp = document.getElementById('asis-fecha');
+  if(!fechaInp || !fechaInp.value) return;
+  if(!confirm('¿Quitar la justificación de este día? Se borrarán las marcas de los 32 estudiantes registradas para esta fecha.')) return;
+  const fecha = fechaInp.value;
+  const data = getAsistencia();
+  delete data[fecha];
+  setAsistencia(data);
+  renderAsisDiaria();
+}
+
+let asisMesActual = null; // índice de mes (0-11) actualmente mostrado en Resumen Mensual
+
+function initAsisMesSelect(){
+  // La navegación mensual es libre (los 12 meses del año), independiente del bimestre activo,
+  // porque "Pasar Lista" permite marcar cualquier fecha sin esa restricción.
+  if(asisMesActual===null){
+    asisMesActual = new Date().getMonth();
+  }
+}
+
+function cambiarMesAsis(delta){
+  asisMesActual = Math.min(11, Math.max(0, asisMesActual + delta));
+  renderAsisResumenMes();
+}
+
+function cicloEstadoCelda(alId, fecha){
+  const data = getAsistencia();
+  if(!data[fecha]) data[fecha]={};
+  const actual = data[fecha][alId]?.estado || '';
+  let siguiente;
+  if(actual==='') siguiente='P';
+  else if(actual==='P') siguiente='A';
+  else if(actual==='A') siguiente='permiso';
+  else if(actual==='permiso') siguiente='ND';
+  else siguiente='';
+
+  if(siguiente==='permiso'){
+    const razon = prompt('Razón del permiso:', data[fecha][alId]?.razon||'');
+    if(razon===null) return; // cancelado, no se cambia el estado
+    data[fecha][alId] = {estado:'permiso', razon:razon.trim()};
+  } else if(siguiente==='ND'){
+    const razon = prompt('Motivo de la actividad/capacitación docente:', data[fecha][alId]?.razon||'');
+    if(razon===null) return;
+    data[fecha][alId] = {estado:'ND', razon:razon.trim()};
+  } else if(siguiente===''){
+    delete data[fecha][alId];
+  } else {
+    data[fecha][alId] = {estado: siguiente};
+  }
+  setAsistencia(data);
+  renderAsisResumenMes();
+  if(document.getElementById('asis-fecha')?.value===fecha) renderAsisDiaria();
+}
+
+function renderAsisResumenMes(){
+  const cont = document.getElementById('asis-resumen-mes-tabla');
+  const contDet = document.getElementById('asis-resumen-permisos');
+  const titulo = document.getElementById('asis-mes-titulo');
+  if(!cont || asisMesActual===null) return;
+  const mes = asisMesActual;
+  const anio = parseInt(getAnio());
+  if(titulo) titulo.textContent = `📅 ${NOMBRES_MES[mes]} de ${anio}`;
+
+  const btnPrev = document.getElementById('asis-mes-prev');
+  const btnNext = document.getElementById('asis-mes-next');
+  if(btnPrev){ btnPrev.disabled = (mes===0); btnPrev.style.opacity = (mes===0)?'.35':'1'; btnPrev.style.cursor = (mes===0)?'not-allowed':'pointer'; }
+  if(btnNext){ btnNext.disabled = (mes===11); btnNext.style.opacity = (mes===11)?'.35':'1'; btnNext.style.cursor = (mes===11)?'not-allowed':'pointer'; }
+
+  const busqueda = (document.getElementById('asis-buscar')?.value||'').toLowerCase().trim();
+  const alumnosFiltrados = busqueda ? ALUMNOS.filter(a=>a.n.toLowerCase().includes(busqueda)) : ALUMNOS;
+  const diasEnMes = new Date(anio, mes+1, 0).getDate();
+  const data = getAsistencia();
+  const permisosDetalle = [];
+  const diasJustificados = [];
+
+  // Precalcular qué días del mes tienen una actividad/capacitación justificada,
+  // para mostrar el motivo verticalmente en el encabezado, sin ensanchar la columna.
+  const motivosPorDia = {};
+  for(let d=1; d<=diasEnMes; d++){
+    const fechaChk = `${anio}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if(data[fechaChk]?._motivoDia) motivosPorDia[d] = data[fechaChk]._motivoDia;
+  }
+
+  let html = `<div style="overflow-x:auto;background:#fdf9ef;padding:10px;border-radius:12px"><table style="border-collapse:collapse;font-size:.7rem;min-width:100%;width:max-content">
+    <thead><tr style="background:#f4ecd8;color:#8a6d3b">
+      <th style="padding:9px 10px;text-align:left;position:sticky;left:0;background:#f4ecd8;min-width:180px;z-index:1;border-radius:10px 0 0 0;border:1px solid #e3d8b8;font-family:'Baloo 2',cursive;font-weight:800">Estudiante</th>`;
+  for(let d=1; d<=diasEnMes; d++){
+    html += `<th style="padding:6px 3px;text-align:center;min-width:23px;border:1px solid #e3d8b8;font-family:'Baloo 2',cursive;font-weight:800">${d}</th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  alumnosFiltrados.forEach((al,idx)=>{
+    const bg = idx%2===0?'#fdf9ef':'#fffdf7';
+    html += `<tr style="background:${bg}">
+      <td style="padding:6px 10px;font-weight:700;white-space:nowrap;position:sticky;left:0;background:${bg};border:1px dashed #e3d8b8;color:#1a4d8f;font-family:'Baloo 2',cursive">${idx+1}. ${al.em} ${al.n}</td>`;
+    for(let d=1; d<=diasEnMes; d++){
+      const fecha = `${anio}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const reg = data[fecha]?.[al.id];
+      let celda = '<span style="display:inline-block;width:17px;height:17px;border-radius:6px;border:1.5px dashed #d8cca4"></span>';
+      const tituloCelda = reg?.razon ? ` title="${reg.razon.replace(/"/g,'&quot;')}"` : '';
+      if(reg?.estado==='P') celda = '<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:7px;background:#4caf50;color:#fff;font-weight:800;font-size:.68rem;box-shadow:0 1px 2px rgba(0,0,0,.15)">✓</span>';
+      else if(reg?.estado==='A') celda = '<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:7px;background:#ef5350;color:#fff;font-weight:800;font-size:.68rem;box-shadow:0 1px 2px rgba(0,0,0,.15)">✕</span>';
+      else if(reg?.estado==='permiso'){
+        celda = '<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:7px;background:#ffa726;color:#fff;font-weight:800;font-size:.66rem;box-shadow:0 1px 2px rgba(0,0,0,.15)">P</span>';
+        permisosDetalle.push({alumno:al, fecha, razon:reg.razon||'(sin especificar)'});
+      } else if(reg?.estado==='ND'){
+        const motivo = motivosPorDia[d] || reg.razon || '';
+        const letra = (idx < motivo.length) ? motivo[idx].toUpperCase() : '';
+        if(letra.trim()===''){
+          celda = '<span style="display:inline-block;width:17px;height:17px;border-radius:6px;border:1.5px dashed #d8cca4"></span>'; // sin letra en esta fila: placeholder normal
+        } else {
+          celda = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:7px;background:#8e5fc7;color:#fff;font-weight:800;font-size:.66rem;box-shadow:0 1px 2px rgba(0,0,0,.15)">${letra}</span>`;
+        }
+      }
+      html += `<td onclick="cicloEstadoCelda('${al.id}','${fecha}')"${tituloCelda||' title="Click para marcar"'} style="text-align:center;padding:4px 2px;cursor:pointer;border:1px dashed #e3d8b8">${celda}</td>`;
+    }
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+  cont.innerHTML = html;
+
+  // Recopilar días justificados por actividad docente (una entrada por fecha, no por alumno)
+  Object.keys(data).forEach(f=>{
+    const partes = f.split('-').map(Number);
+    if(partes[0]===anio && (partes[1]-1)===mes && data[f]?._motivoDia){
+      diasJustificados.push({fecha:f, motivo:data[f]._motivoDia});
+    }
+  });
+
+  if(contDet){
+    let html2 = '';
+    if(diasJustificados.length>0){
+      diasJustificados.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      html2 += '<h3 style="font-size:.9rem;color:#6a1b9a;margin:4px 0 8px">📌 Días Justificados (Actividad Docente)</h3><div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">';
+      diasJustificados.forEach(dj=>{
+        const [y,m,d] = dj.fecha.split('-');
+        html2 += `<div style="background:#f3e5f5;border-left:4px solid #6a1b9a;border-radius:8px;padding:8px 12px;font-size:.8rem">
+          <strong>${d}/${m}/${y}</strong> — <span style="color:#666">${dj.motivo}</span>
+        </div>`;
+      });
+      html2 += '</div>';
+    }
+    if(permisosDetalle.length===0 && diasJustificados.length===0){
+      html2 += '<p style="font-size:.8rem;color:#888;text-align:center;padding:10px">No hay permisos ni días justificados registrados este mes.</p>';
+    } else if(permisosDetalle.length===0){
+      // Solo hay días justificados, no hay permisos que listar
+    } else {
+      permisosDetalle.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      html2 += '<h3 style="font-size:.9rem;color:#e65100;margin:4px 0 8px">📋 Detalle de Permisos del Mes</h3><div style="display:flex;flex-direction:column;gap:6px">';
+      permisosDetalle.forEach(p=>{
+        const [y,m,d] = p.fecha.split('-');
+        html2 += `<div style="background:#fff3e0;border-left:4px solid #e65100;border-radius:8px;padding:8px 12px;font-size:.8rem">
+          <strong>${p.alumno.em} ${p.alumno.n}</strong> — ${d}/${m}/${y}<br>
+          <span style="color:#666">${p.razon}</span>
+        </div>`;
+      });
+      html2 += '</div>';
+    }
+    contDet.innerHTML = html2;
+  }
+}
+
+function descargarAsistenciaPDF(){
+  const cont = document.getElementById('asis-resumen-mes-tabla');
+  if(!cont || !cont.querySelector('table')){ alert('No hay datos de asistencia para descargar.'); return; }
+  const titulo = `Asistencia — ${NOMBRES_MES[asisMesActual]} de ${getAnio()} — 5to Grado`;
+  let pw = document.getElementById('_print_wrap');
+  if(!pw){ pw=document.createElement('div'); pw.id='_print_wrap'; document.body.appendChild(pw); }
+  pw.innerHTML = `<div style="padding:16px">
+    <h2 style="font-family:'Baloo 2',cursive;color:#01579b;margin-bottom:12px">${titulo}</h2>
+    ${cont.innerHTML}
+  </div>`;
+  document.body.dataset.printing='1';
+  setTimeout(()=>{ window.print(); document.body.dataset.printing=''; pw.innerHTML=''; }, 200);
 }
 
 // ═══════════════════════════════════════════════
