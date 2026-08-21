@@ -1259,6 +1259,14 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <span class="m-ico">👨‍👩‍👧</span>
     <span class="m-tit">Vista Padres</span>
   </button>
+  <button class="menu-btn" style="background:linear-gradient(145deg,#00695c,#00897b)" onclick="abrirPanel('repac',this)">
+    <span class="m-ico">📂</span>
+    <span class="m-tit">Reporte Académico</span>
+  </button>
+  <button class="menu-btn" style="background:linear-gradient(145deg,#c2185b,#e91e63)" onclick="abrirPanel('subir',this)">
+    <span class="m-ico">📤</span>
+    <span class="m-tit">Subir Tarea (Padres)</span>
+  </button>
   <button class="menu-btn mb-reg" onclick="abrirPanelPass('reg',this)">
     <span class="m-ico">🔒</span>
     <span class="m-tit">Registro Interno</span>
@@ -1455,6 +1463,76 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 </div>
 
 <!-- ══════════════════════════════════════
+     REPORTE ACADÉMICO DEL DÍA (con avatares)
+══════════════════════════════════════ -->
+<div id="sec-repac" class="sec" style="display:none">
+  <div class="card">
+    <h2>📂 Reporte Académico del Día</h2>
+    <p style="font-size:.84rem;color:#555;margin-bottom:6px">
+      Muestra, usando el <strong>avatar</strong> de cada estudiante (sin nombres), qué trabajos de <strong>hoy</strong> entregó y cuáles no. Ideal para compartir con el grupo y motivar a que todos completen sus tareas.
+    </p>
+    <div id="repac-especificacion" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:.78rem;background:#f5f5f5;border-radius:10px;padding:10px 14px;margin-bottom:10px">
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:#4caf50;color:#fff;font-weight:800;font-size:.7rem">✓</span> Entregada</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:#ef5350;color:#fff;font-weight:800;font-size:.7rem">✕</span> No entregada</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:#bdbdbd;color:#fff;font-weight:800;font-size:.65rem">⏳</span> Pendiente de calificar</span>
+    </div>
+    <div id="repac-leyenda" style="font-size:.8rem;color:#00695c;background:#e0f2f1;border-radius:10px;padding:10px 14px;margin-bottom:14px"></div>
+    <div id="repac-lista" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn bv" onclick="renderReporteAcademico()" style="padding:10px 16px">🔄 Actualizar</button>
+      <button class="btn bam" id="btn-enviar-wa-repac" onclick="enviarReporteAcademicoWhatsApp()" style="padding:10px 16px;display:none">📲 Enviar por WhatsApp</button>
+      <button class="btn bv" id="btn-descargar-img-repac" onclick="descargarImagenReporteAcademico()" style="padding:10px 16px;display:none">🖼️ Descargar Imagen (para WhatsApp)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     BUZÓN DE TAREAS — sube foto sin contraseña (padres)
+══════════════════════════════════════ -->
+<div id="sec-subir" class="sec" style="display:none">
+  <div class="card">
+    <h2>📤 Subir Tarea</h2>
+    <p style="font-size:.84rem;color:#555;margin-bottom:14px">
+      Desde acá podés enviarle al maestro una foto de la tarea de tu hijo/a. Seguí los pasos: elegí su avatar, la materia, la actividad, y subí la foto.
+    </p>
+
+    <!-- Paso 1: elegir avatar -->
+    <div id="subir-paso1">
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">1️⃣ ¿Cuál es tu hijo/a?</h3>
+      <div class="avatar-grid" id="subir-av-grid"></div>
+    </div>
+
+    <!-- Paso 2: elegir materia -->
+    <div id="subir-paso2" style="display:none;margin-top:18px">
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">2️⃣ ¿Qué materia?</h3>
+      <div id="subir-mat-sel" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Paso 3: elegir actividad -->
+    <div id="subir-paso3" style="display:none;margin-top:18px">
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">3️⃣ ¿Qué actividad es?</h3>
+      <div id="subir-act-sel" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- Paso 4: subir foto -->
+    <div id="subir-paso4" style="display:none;margin-top:18px">
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">4️⃣ Subí hasta 3 fotos de la tarea</h3>
+      <p style="font-size:.78rem;color:#888;margin-bottom:8px">Podés subir hasta 3 fotos (por ejemplo, si la tarea tiene varias páginas).</p>
+      <input type="file" id="subir-input-foto" accept="image/*" capture="environment" multiple onchange="previsualizarFotoTarea(event)"
+        style="display:block;margin-bottom:10px;font-family:'Baloo 2',cursive">
+      <div id="subir-preview" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <button class="btn bv" id="subir-btn-enviar" onclick="enviarFotoTarea()" style="padding:11px 18px;display:none">📤 Enviar Tarea</button>
+    </div>
+
+    <div id="subir-confirmacion" style="display:none;margin-top:18px;background:#e8f5e9;border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:2rem">✅</div>
+      <div style="font-weight:700;color:#2e7d32;margin-top:6px">¡Tarea enviada! El maestro la revisará pronto.</div>
+      <button class="btn bgr" onclick="reiniciarSubirTarea()" style="margin-top:12px">📤 Enviar otra tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
      REGISTRO INTERNO
 ══════════════════════════════════════ -->
 <div id="sec-reg" class="sec" style="display:none">
@@ -1471,6 +1549,16 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <div class="card">
       <h2>📊 Resumen por Estudiante</h2>
       <div class="tw"><table class="reg" id="tbl-res"></table></div>
+    </div>
+    <div class="card">
+      <h2>📲 Reporte Diario para WhatsApp</h2>
+      <p style="font-size:.82rem;color:#666;margin-bottom:10px">Genera automáticamente un reporte de texto con las calificaciones de las actividades registradas <strong>hoy</strong>, listo para enviar al grupo de padres de familia.</p>
+      <p style="font-size:.76rem;color:#b26a00;background:#fff8e1;border-radius:8px;padding:8px 10px;margin-bottom:10px">⚠️ Este reporte incluye el nombre real y la nota de cada alumno, visibles para todo el grupo. Si preferís proteger la privacidad de las calificaciones, considerá enviarlo de forma individual a cada padre en vez del grupo general.</p>
+      <div id="reporte-diario-preview" style="background:#f5f5f5;border-radius:10px;padding:12px;font-size:.8rem;white-space:pre-wrap;font-family:monospace;max-height:260px;overflow-y:auto;margin-bottom:10px;display:none"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn bv" onclick="generarReporteDiario()" style="padding:11px 16px">🔄 Generar Reporte del Día</button>
+        <button class="btn bam" id="btn-enviar-wa" onclick="enviarReporteDiarioWhatsApp()" style="padding:11px 16px;display:none">📲 Enviar por WhatsApp</button>
+      </div>
     </div>
     <div class="card">
       <h2>📋 Detalle por Materia y Actividad</h2>
@@ -2374,6 +2462,18 @@ function initAsistenciaFirebase(){
   });
 }
 
+// Fotos de tareas subidas por los padres — {materia: {actIndex: {alumnoId: {foto, fecha}}}}
+let _tareasFotos = {};
+function getTareasFotos(){ return _tareasFotos; }
+function initTareasFotosFirebase(){
+  if(!bimestreActivo) return;
+  db.ref(`tareasfotos_${bimestreActivo}`).on('value',snap=>{
+    _tareasFotos = snap.val() || {};
+    localStorage.setItem(`tareasfotos_${bimestreActivo}`, JSON.stringify(_tareasFotos));
+    if(matActual) renderCuaderno(matActual);
+  });
+}
+
 function seleccionarBimestre(bimId){
   // Guardar promedios del bimestre actual antes de cambiar
   if(bimestreActivo) guardarPromediosBimestre(bimestreActivo);
@@ -2413,6 +2513,7 @@ function seleccionarBimestre(bimId){
   // Traer notas reales de los OTROS bimestres desde Firebase, para que la boleta
   // sume correctamente aunque no se haya guardado manualmente el promedio antes.
   refrescarPromediosDeOtrosBimestres();
+  initTareasFotosFirebase();
   // Mostrar menú de botones
   const grid = document.querySelector('.menu-grid');
   if(grid) grid.style.display='grid';
@@ -2803,6 +2904,8 @@ const PANEL_COLORES = {
   rep :'linear-gradient(90deg,#7b1fa2,#9c27b0)',
   cond:'linear-gradient(90deg,#e65100,#ff6f00)',
   asis:'linear-gradient(90deg,#01579b,#0288d1)',
+  repac:'linear-gradient(90deg,#00695c,#00897b)',
+  subir:'linear-gradient(90deg,#c2185b,#e91e63)',
   config:'linear-gradient(90deg,#263238,#455a64)',
   recon:'linear-gradient(90deg,#1b5e20,#43a047)',
 };
@@ -2816,11 +2919,13 @@ const PANEL_TITULOS = {
   rep :'⚠️ Reporte Disciplinario',
   cond:'🌟 Evaluación de Conducta',
   asis:'🗓️ Asistencia',
+  repac:'📂 Reporte Académico',
+  subir:'📤 Subir Tarea',
   config:'⚙️ Configuración',
   recon:'⭐ Reconocimientos y Puntos',
 };
 let panelActivo = null;
-const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','config','recon'];
+const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','repac','subir','config','recon'];
 
 function abrirPanel(sec, btn){
   if(panelActivo===sec){ cerrarPanel(); return; }
@@ -2850,6 +2955,8 @@ function abrirPanel(sec, btn){
   if(sec==='rep')    initSecRep();
   if(sec==='cond')   renderCondGrid();
   if(sec==='asis')   initAsistencia();
+  if(sec==='repac')  renderReporteAcademico();
+  if(sec==='subir')  initSubirTarea();
   if(sec==='bol')    setTimeout(()=>mostrarBoleta('imprimir'), 200);
   if(sec==='config') initConfig();
   if(sec==='recon')  initSecRecon();
@@ -3165,12 +3272,18 @@ function renderCuaderno(mat){
       const cls = nota===undefined||nota===null||nota==='' ? 'vacia' : 'con-nota';
       const val = nota!==undefined&&nota!==null&&nota!=='' ? nota : '';
       if(val!=='') { total+=Number(val); conNotas++; }
+      const registroFoto = getTareasFotos()?.[mat]?.[i]?.[al.id];
+      const cantFotos = registroFoto ? (registroFoto.fotos ? registroFoto.fotos.length : (registroFoto.foto ? 1 : 0)) : 0;
+      const iconoFoto = cantFotos>0
+        ? `<span onclick="verFotoTarea('${mat.replace(/'/g,"\\'")}',${i},${al.id})" title="Ver ${cantFotos>1?cantFotos+' fotos':'foto'} de la tarea enviada"
+             style="display:inline-block;cursor:pointer;font-size:.85rem;margin-left:3px;vertical-align:middle">📷${cantFotos>1?`<sup style="font-size:.6rem">${cantFotos}</sup>`:''}</span>`
+        : '';
       html += `<td><input type="number" class="ninp ${cls}" min="0" max="100"
         data-mat="${mat}" data-al="${al.id}" data-act="${i}"
         value="${val}" placeholder="–"
         oninput="this.className='ninp '+(this.value===''?'vacia':'con-nota')"
         onblur="actualizarNota(this)"
-        onkeydown="navegarCuaderno(event,this)"></td>`;
+        onkeydown="navegarCuaderno(event,this)">${iconoFoto}</td>`;
     });
     html += `<td class="td-tot">${conNotas>0?total:'–'}</td></tr>`;
   });
@@ -3838,6 +3951,400 @@ function borrarTodo(){
   renderRanking();
   if(matActual) renderCuaderno(matActual);
   renderResumen(); renderRegInt();
+}
+
+// ═══════════════════════════════════════════════
+// REPORTE DIARIO PARA WHATSAPP
+// ═══════════════════════════════════════════════
+// Detecta las actividades (de cualquier materia) creadas HOY, según el timestamp de su id.
+// Se reutiliza tanto en el reporte de notas como en el reporte académico con avatares.
+function obtenerActividadesDeHoy(){
+  const c = getCuadernos();
+  const hoy = new Date();
+  const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
+  const finHoy = inicioHoy + 24*60*60*1000;
+  let actividadesHoy = [];
+  MATERIAS.forEach(mat=>{
+    const d = c[mat]||{actividades:[],notas:{}};
+    (d.actividades||[]).forEach((act,i)=>{
+      if(act.id>=inicioHoy && act.id<finHoy){
+        actividadesHoy.push({materia:mat, actividad:act, indice:i, notas:d.notas});
+      }
+    });
+  });
+  return actividadesHoy;
+}
+
+function generarReporteDiario(){
+  const hoy = new Date();
+  const fechaTexto = hoy.toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const actividadesHoy = obtenerActividadesDeHoy();
+
+  const preview = document.getElementById('reporte-diario-preview');
+  const btnWa = document.getElementById('btn-enviar-wa');
+
+  if(actividadesHoy.length===0){
+    preview.style.display='block';
+    preview.textContent = 'No se registraron actividades nuevas hoy en el Cuaderno de Registro. Agrega una actividad y sus notas primero para poder generar el reporte.';
+    btnWa.style.display='none';
+    window._reporteDiarioTexto = '';
+    return;
+  }
+
+  let texto = `📚 *Reporte de Calificaciones del Día*\n`;
+  texto += `🏫 Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo"\n`;
+  texto += `📖 5to Grado\n`;
+  texto += `📅 ${fechaTexto}\n\n`;
+
+  actividadesHoy.forEach(item=>{
+    texto += `📝 *${item.materia} – ${item.actividad.nombre}*\n`;
+    ALUMNOS.forEach((al,idx)=>{
+      const v = item.notas[`${al.id}_${item.indice}`];
+      const nota = (v!==null && v!==undefined && v!=='') ? v : 'No entregó';
+      texto += `${idx+1}. ${al.n} — ${nota}\n`;
+    });
+    texto += `\n`;
+  });
+
+  texto += `_Reporte generado automáticamente por el sistema de registro escolar._`;
+
+  window._reporteDiarioTexto = texto;
+  preview.style.display='block';
+  preview.textContent = texto;
+  btnWa.style.display='inline-block';
+}
+
+function enviarReporteDiarioWhatsApp(){
+  const texto = window._reporteDiarioTexto;
+  if(!texto){ alert('Primero genera el reporte con el botón "🔄 Generar Reporte del Día".'); return; }
+  const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════
+// REPORTE ACADÉMICO DEL DÍA — con avatares (protege identidad)
+// Muestra qué actividades de hoy entregó cada estudiante y cuáles no.
+// ═══════════════════════════════════════════════
+function renderReporteAcademico(){
+  const actividadesHoy = obtenerActividadesDeHoy();
+  const leyenda = document.getElementById('repac-leyenda');
+  const lista = document.getElementById('repac-lista');
+  const btnWa = document.getElementById('btn-enviar-wa-repac');
+  const btnImg = document.getElementById('btn-descargar-img-repac');
+  if(!lista) return;
+
+  if(actividadesHoy.length===0){
+    leyenda.innerHTML = 'No hay actividades nuevas registradas hoy. Agrega una actividad en el Cuaderno de Registro para que aparezca aquí.';
+    lista.innerHTML = '';
+    if(btnWa) btnWa.style.display='none';
+    if(btnImg) btnImg.style.display='none';
+    window._reporteAcademicoTexto = '';
+    return;
+  }
+
+  // Leyenda numerada de las actividades de hoy
+  leyenda.innerHTML = '<strong>📋 Actividades de hoy:</strong><br>' +
+    actividadesHoy.map((item,i)=>`${i+1}. ${item.materia} – ${item.actividad.nombre}`).join('<br>');
+
+  // Si NINGÚN estudiante tiene nota todavía en una actividad, esa actividad está
+  // "pendiente de calificar" (el maestro aún no la revisó), no "no entregada".
+  const actividadPendiente = actividadesHoy.map(item=>
+    !ALUMNOS.some(al=>{
+      const v = item.notas[`${al.id}_${item.indice}`];
+      return v!==null && v!==undefined && v!=='';
+    })
+  );
+
+  let html = '';
+  ALUMNOS.forEach((al,idx)=>{
+    const bg = idx%2===0 ? '#fafafa' : '#fff';
+    const iconos = actividadesHoy.map((item,i)=>{
+      const v = item.notas[`${al.id}_${item.indice}`];
+      const entrego = (v!==null && v!==undefined && v!=='');
+      if(entrego) return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#4caf50;color:#fff;font-weight:800;font-size:.75rem" title="Entregada">✓</span>';
+      if(actividadPendiente[i]) return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#bdbdbd;color:#fff;font-weight:800;font-size:.68rem" title="Pendiente de calificar">⏳</span>';
+      return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#ef5350;color:#fff;font-weight:800;font-size:.75rem" title="No entregada">✕</span>';
+    }).join(' ');
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:${bg};border-radius:10px;flex-wrap:wrap">
+      <span style="font-size:1.6rem">${al.em}</span>
+      <span style="font-weight:700;color:#00695c;min-width:150px">${al.av}</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${iconos}</div>
+    </div>`;
+  });
+  lista.innerHTML = html;
+
+  // Texto para compartir por WhatsApp, usando avatar en vez de nombre real
+  const hoy = new Date();
+  const fechaTexto = hoy.toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  let texto = `📂 *Reporte Académico del Día*\n`;
+  texto += `🏫 Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo"\n`;
+  texto += `📖 5to Grado\n`;
+  texto += `📅 ${fechaTexto}\n\n`;
+  texto += `📋 *Actividades de hoy:*\n`;
+  actividadesHoy.forEach((item,i)=>{ texto += `${i+1}. ${item.materia} – ${item.actividad.nombre}\n`; });
+  texto += `\n`;
+  ALUMNOS.forEach(al=>{
+    const marcas = actividadesHoy.map((item,i)=>{
+      const v = item.notas[`${al.id}_${item.indice}`];
+      if(v!==null && v!==undefined && v!=='') return '✅';
+      return actividadPendiente[i] ? '⏳' : '❌';
+    }).join(' ');
+    texto += `${al.em} ${al.av}: ${marcas}\n`;
+  });
+  texto += `\n✅ = Entregada   ❌ = No entregada   ⏳ = Pendiente de calificar\n`;
+  texto += `_¡Ánimo a completar todas las tareas! 💪_`;
+
+  window._reporteAcademicoTexto = texto;
+  if(btnWa) btnWa.style.display='inline-block';
+  if(btnImg) btnImg.style.display='inline-block';
+}
+
+// Genera una imagen PNG del reporte académico (leyenda + lista de avatares) para
+// descargar y adjuntar manualmente en WhatsApp — WhatsApp no permite adjuntar
+// archivos automáticamente desde el navegador, así que este es el paso intermedio.
+async function descargarImagenReporteAcademico(){
+  const leyenda = document.getElementById('repac-leyenda');
+  const especificacion = document.getElementById('repac-especificacion');
+  const lista = document.getElementById('repac-lista');
+  if(!lista || !lista.innerHTML.trim()){ alert('No hay datos de hoy para generar la imagen.'); return; }
+
+  const hoy = new Date();
+  const fechaTexto = hoy.toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Contenedor temporal fuera de pantalla, con estilo limpio tipo "tarjeta" para la captura
+  const cont = document.createElement('div');
+  cont.style.cssText = 'position:fixed;left:-9999px;top:0;width:520px;background:#fff;padding:20px;font-family:"Baloo 2",cursive;';
+  cont.innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:1.1rem;font-weight:800;color:#00695c">📂 Reporte Académico del Día</div>
+      <div style="font-size:.8rem;color:#555">Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo" — 5to Grado</div>
+      <div style="font-size:.8rem;color:#888;text-transform:capitalize">${fechaTexto}</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.75rem;background:#f5f5f5;border-radius:10px;padding:8px 12px;margin-bottom:10px">${especificacion.innerHTML}</div>
+    <div style="font-size:.8rem;color:#00695c;background:#e0f2f1;border-radius:10px;padding:10px 14px;margin-bottom:14px">${leyenda.innerHTML}</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${lista.innerHTML}</div>
+    <div style="text-align:center;margin-top:14px;font-size:.78rem;color:#00695c;font-weight:700">¡Ánimo a completar todas las tareas! 💪</div>
+  `;
+  document.body.appendChild(cont);
+
+  try{
+    mostrarProgreso('Generando imagen del reporte...', 40);
+    const canvas = await html2canvas(cont, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const link = document.createElement('a');
+    link.download = `Reporte_Academico_${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    mostrarProgreso('¡Imagen lista!', 100);
+    setTimeout(ocultarProgreso, 800);
+  } catch(e){
+    ocultarProgreso();
+    alert('Error al generar la imagen: '+e.message);
+  } finally {
+    document.body.removeChild(cont);
+  }
+}
+
+function enviarReporteAcademicoWhatsApp(){
+  const texto = window._reporteAcademicoTexto;
+  if(!texto){ alert('Primero presiona "🔄 Actualizar" para generar el reporte.'); return; }
+  const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════
+// VISOR DE FOTO DE TAREA (lightbox) — para el maestro, desde el Cuaderno de Registro
+// ═══════════════════════════════════════════════
+function verFotoTarea(mat, actIndex, alId){
+  const registro = getTareasFotos()?.[mat]?.[actIndex]?.[alId];
+  if(!registro){ alert('No se encontró la foto.'); return; }
+  // Compatibilidad: registros nuevos usan "fotos" (array), los viejos usaban "foto" (una sola imagen)
+  const fotos = registro.fotos || (registro.foto ? [registro.foto] : []);
+  if(fotos.length===0){ alert('No se encontró la foto.'); return; }
+  const al = ALUMNOS.find(a=>a.id===alId);
+  const fecha = registro.fecha ? new Date(registro.fecha).toLocaleString('es-GT') : '';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'lightbox-foto-tarea';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out;overflow-y:auto';
+  overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
+  const imgs = fotos.map((f,i)=>`<img src="${f}" style="max-width:92vw;max-height:70vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:10px" alt="Foto ${i+1} de ${fotos.length}">`).join('');
+  overlay.innerHTML = `
+    <div style="color:#fff;font-family:'Baloo 2',cursive;text-align:center;margin-bottom:12px">
+      <div style="font-weight:800;font-size:1.05rem">${al ? al.n : ''}</div>
+      <div style="font-size:.8rem;opacity:.8">${mat} · ${fecha} ${fotos.length>1?`· ${fotos.length} fotos`:''}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">${imgs}</div>
+    <button onclick="event.stopPropagation();document.body.removeChild(document.getElementById('lightbox-foto-tarea'))"
+      style="margin-top:4px;padding:9px 20px;border-radius:20px;border:none;background:#fff;color:#333;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Cerrar</button>
+  `;
+  document.body.appendChild(overlay);
+}
+
+// ═══════════════════════════════════════════════
+// BUZÓN DE TAREAS — flujo público para que los padres suban la foto
+// ═══════════════════════════════════════════════
+const MAX_FOTOS_TAREA = 3;
+let _subirTarea = { alumnoId:null, materia:null, actIndex:null, fotos:[] };
+
+function initSubirTarea(){
+  reiniciarSubirTarea();
+  const ag = document.getElementById('subir-av-grid');
+  if(ag && !ag.dataset.armado){
+    ALUMNOS.forEach(a=>{
+      const d = document.createElement('div');
+      d.className = 'av-card';
+      d.dataset.id = a.id;
+      d.innerHTML = `<span class="em">${a.em}</span><span class="nm">${a.av}</span>`;
+      d.onclick = ()=>seleccionarAlumnoSubirTarea(a.id, d);
+      ag.appendChild(d);
+    });
+    ag.dataset.armado = '1';
+  }
+}
+
+function reiniciarSubirTarea(){
+  _subirTarea = { alumnoId:null, materia:null, actIndex:null, fotos:[] };
+  document.getElementById('subir-paso1').style.display = 'block';
+  document.getElementById('subir-paso2').style.display = 'none';
+  document.getElementById('subir-paso3').style.display = 'none';
+  document.getElementById('subir-paso4').style.display = 'none';
+  document.getElementById('subir-confirmacion').style.display = 'none';
+  document.querySelectorAll('#subir-av-grid .av-card').forEach(c=>c.classList.remove('sel'));
+  const preview = document.getElementById('subir-preview'); if(preview) preview.innerHTML='';
+  const btnEnv = document.getElementById('subir-btn-enviar'); if(btnEnv) btnEnv.style.display='none';
+  const inpFoto = document.getElementById('subir-input-foto'); if(inpFoto) inpFoto.value='';
+}
+
+function seleccionarAlumnoSubirTarea(alId, card){
+  _subirTarea.alumnoId = alId;
+  document.querySelectorAll('#subir-av-grid .av-card').forEach(c=>c.classList.remove('sel'));
+  if(card) card.classList.add('sel');
+
+  const cont = document.getElementById('subir-mat-sel');
+  cont.innerHTML = '';
+  MATERIAS.forEach(m=>{
+    const b = document.createElement('button');
+    b.className = 'btn bgr';
+    b.style.cssText = 'padding:9px 14px;font-size:.82rem';
+    b.textContent = m;
+    b.onclick = ()=>seleccionarMateriaSubirTarea(m, b);
+    cont.appendChild(b);
+  });
+  document.getElementById('subir-paso2').style.display = 'block';
+  document.getElementById('subir-paso3').style.display = 'none';
+  document.getElementById('subir-paso4').style.display = 'none';
+}
+
+function seleccionarMateriaSubirTarea(mat, btn){
+  _subirTarea.materia = mat;
+  _subirTarea.actIndex = null;
+  document.querySelectorAll('#subir-mat-sel button').forEach(b=>b.classList.remove('bv'));
+  document.querySelectorAll('#subir-mat-sel button').forEach(b=>b.classList.add('bgr'));
+  if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
+
+  const c = getCuadernos();
+  const acts = c[mat]?.actividades || [];
+  const cont = document.getElementById('subir-act-sel');
+  if(acts.length===0){
+    cont.innerHTML = '<p style="font-size:.82rem;color:#888">El maestro todavía no ha creado actividades en esta materia.</p>';
+  } else {
+    cont.innerHTML = acts.map((a,i)=>
+      `<button class="btn bgr" onclick="seleccionarActividadSubirTarea(${i}, this)" style="text-align:left;padding:10px 14px;font-size:.85rem">${a.nombre}</button>`
+    ).join('');
+  }
+  document.getElementById('subir-paso3').style.display = 'block';
+  document.getElementById('subir-paso4').style.display = 'none';
+}
+
+function seleccionarActividadSubirTarea(indice, btn){
+  _subirTarea.actIndex = indice;
+  document.querySelectorAll('#subir-act-sel button').forEach(b=>{ b.classList.remove('bv'); b.classList.add('bgr'); });
+  if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
+  document.getElementById('subir-paso4').style.display = 'block';
+}
+
+function previsualizarFotoTarea(event){
+  const files = Array.from(event.target.files || []);
+  if(files.length===0) return;
+
+  const espacioDisponible = MAX_FOTOS_TAREA - _subirTarea.fotos.length;
+  if(espacioDisponible<=0){
+    alert(`Ya agregaste el máximo de ${MAX_FOTOS_TAREA} fotos.`);
+    event.target.value='';
+    return;
+  }
+  const aProcesar = files.slice(0, espacioDisponible);
+  if(files.length > aProcesar.length){
+    alert(`Solo se pueden subir hasta ${MAX_FOTOS_TAREA} fotos en total. Se tomaron las primeras ${aProcesar.length}.`);
+  }
+
+  let pendientes = aProcesar.length;
+  aProcesar.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        // Comprimir/redimensionar antes de guardar (evita saturar la base de datos)
+        const MAX = 900;
+        let w = img.width, h = img.height;
+        if(w>h && w>MAX){ h = Math.round(h*MAX/w); w = MAX; }
+        else if(h>=w && h>MAX){ w = Math.round(w*MAX/h); h = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL('image/jpeg', 0.6);
+        _subirTarea.fotos.push(base64);
+        pendientes--;
+        if(pendientes===0){ renderPreviewFotosTarea(); event.target.value=''; }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPreviewFotosTarea(){
+  const preview = document.getElementById('subir-preview');
+  const btnEnviar = document.getElementById('subir-btn-enviar');
+  const inpFoto = document.getElementById('subir-input-foto');
+
+  preview.innerHTML = _subirTarea.fotos.map((foto,i)=>`
+    <div style="position:relative">
+      <img src="${foto}" style="width:110px;height:110px;object-fit:cover;border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.15)">
+      <button type="button" onclick="quitarFotoTarea(${i})" title="Quitar esta foto"
+        style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:none;background:#ef5350;color:#fff;font-weight:800;cursor:pointer;font-size:.8rem">✕</button>
+    </div>
+  `).join('');
+
+  btnEnviar.style.display = _subirTarea.fotos.length>0 ? 'inline-block' : 'none';
+  // Si ya se llegó al máximo, ocultamos el input para evitar confusión hasta que quiten alguna
+  inpFoto.style.display = _subirTarea.fotos.length >= MAX_FOTOS_TAREA ? 'none' : 'block';
+}
+
+function quitarFotoTarea(indice){
+  _subirTarea.fotos.splice(indice, 1);
+  renderPreviewFotosTarea();
+}
+
+function enviarFotoTarea(){
+  const { alumnoId, materia, actIndex, fotos } = _subirTarea;
+  if(!alumnoId || !materia || actIndex===null || !fotos || fotos.length===0){
+    alert('Falta completar un paso: alumno, materia, actividad o al menos una foto.');
+    return;
+  }
+  const path = `tareasfotos_${bimestreActivo}/${materia}/${actIndex}/${alumnoId}`;
+  db.ref(path).set({ fotos: fotos, fecha: Date.now() })
+    .then(()=>{
+      document.getElementById('subir-paso1').style.display = 'none';
+      document.getElementById('subir-paso2').style.display = 'none';
+      document.getElementById('subir-paso3').style.display = 'none';
+      document.getElementById('subir-paso4').style.display = 'none';
+      document.getElementById('subir-confirmacion').style.display = 'block';
+    })
+    .catch(e=>{
+      alert('No se pudo enviar la tarea. Revisa tu conexión a internet e intenta de nuevo.');
+      console.error(e);
+    });
 }
 
 // ═══════════════════════════════════════════════
