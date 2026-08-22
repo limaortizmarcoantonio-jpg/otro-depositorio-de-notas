@@ -1510,7 +1510,12 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 
     <!-- Paso 3: elegir actividad -->
     <div id="subir-paso3" style="display:none;margin-top:18px">
-      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">3️⃣ ¿Qué actividad es?</h3>
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:6px">3️⃣ ¿Qué actividad es?</h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.75rem;margin-bottom:10px">
+        <span>🔴 Pendiente de subir</span>
+        <span>📤 Enviada (esperando nota)</span>
+        <span>✓ Calificada</span>
+      </div>
       <div id="subir-act-sel" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
 
@@ -4245,12 +4250,36 @@ function seleccionarMateriaSubirTarea(mat, btn){
   const c = getCuadernos();
   const acts = c[mat]?.actividades || [];
   const cont = document.getElementById('subir-act-sel');
+  const alId = _subirTarea.alumnoId;
+
   if(acts.length===0){
     cont.innerHTML = '<p style="font-size:.82rem;color:#888">El maestro todavía no ha creado actividades en esta materia.</p>';
   } else {
-    cont.innerHTML = acts.map((a,i)=>
-      `<button class="btn bgr" onclick="seleccionarActividadSubirTarea(${i}, this)" style="text-align:left;padding:10px 14px;font-size:.85rem">${a.nombre}</button>`
-    ).join('');
+    cont.innerHTML = acts.map((a,i)=>{
+      // Estado de ESTE alumno para esta actividad: calificada / enviada (esperando nota) / pendiente de subir
+      const notaRaw = c[mat]?.notas?.[`${alId}_${i}`];
+      const nota = getNota(notaRaw);
+      const yaCalificada = (nota!==undefined && nota!==null && nota!=='');
+      const registroFoto = getTareasFotos()?.[mat]?.[i]?.[alId];
+      const yaEnviada = registroFoto && ((registroFoto.fotos && registroFoto.fotos.length>0) || registroFoto.foto);
+
+      let badge, borde;
+      if(yaCalificada){
+        badge = '<span style="background:#4caf50;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">✓ Calificada</span>';
+        borde = 'border-left:5px solid #4caf50';
+      } else if(yaEnviada){
+        badge = '<span style="background:#ffa726;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">📤 Enviada</span>';
+        borde = 'border-left:5px solid #ffa726';
+      } else {
+        badge = '<span style="background:#ef5350;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">🔴 Pendiente de subir</span>';
+        borde = 'border-left:5px solid #ef5350';
+      }
+
+      return `<button class="btn bgr" onclick="seleccionarActividadSubirTarea(${i}, this)"
+        style="text-align:left;padding:10px 14px;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px;${borde}">
+        <span>${a.nombre}</span>${badge}
+      </button>`;
+    }).join('');
   }
   document.getElementById('subir-paso3').style.display = 'block';
   document.getElementById('subir-paso4').style.display = 'none';
