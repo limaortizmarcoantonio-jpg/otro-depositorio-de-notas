@@ -168,6 +168,7 @@ input:focus,select:focus{outline:none;border-color:var(--az2);background:#fff}
 .detalle-alumno{display:none}
 .detalle-alumno.on{display:block;animation:fadeSlide .3s ease}
 @keyframes fadeSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes parpadeoFoto{0%,100%{opacity:1}50%{opacity:.4}}
 
 .det-header{
   display:flex;align-items:center;gap:14px;margin-bottom:16px;
@@ -1241,6 +1242,24 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <p style="font-size:.84rem;color:#666;margin-bottom:16px">Cada bimestre tiene su propio registro independiente</p>
     <div class="bim-grid" id="bim-grid"></div>
   </div>
+
+  <div class="card" style="text-align:center;padding:20px">
+    <h2 style="justify-content:center;font-size:1.2rem">🗓️ Asistencia</h2>
+    <p style="font-size:.84rem;color:#666;margin-bottom:16px">La asistencia es del ciclo escolar completo, no depende del bimestre — pasá lista o revisá el cuaderno de asistencia desde acá, sin necesidad de elegir un bimestre primero.</p>
+    <button class="menu-btn mb-asis" style="background:linear-gradient(145deg,#01579b,#0288d1);max-width:260px;margin:0 auto" onclick="abrirAsistenciaGeneral()">
+      <span class="m-ico">🗓️</span>
+      <span class="m-tit">Abrir Cuaderno de Asistencia</span>
+    </button>
+  </div>
+
+  <div class="card" style="text-align:center;padding:20px">
+    <h2 style="justify-content:center;font-size:1.2rem">📕 Cuaderno de Conocimientos</h2>
+    <p style="font-size:.84rem;color:#666;margin-bottom:16px">Registro formal de faltas graves del ciclo escolar completo, con numeración consecutiva y sugerencia de sanción según la Ley de Convivencia Pacífica.</p>
+    <button class="menu-btn" style="background:linear-gradient(145deg,#4e342e,#795548);max-width:260px;margin:0 auto" onclick="abrirConocimientosGeneral()">
+      <span class="m-ico">📕</span>
+      <span class="m-tit">Abrir Cuaderno de Conocimientos</span>
+    </button>
+  </div>
 </div>
 
 <div id="app-principal" style="display:none">
@@ -1286,10 +1305,6 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
   <button class="menu-btn mb-cond" onclick="abrirPanelPass('cond',this)">
     <span class="m-ico">🌟</span>
     <span class="m-tit">Evaluación de Conducta</span>
-  </button>
-  <button class="menu-btn mb-asis" style="background:linear-gradient(145deg,#01579b,#0288d1)" onclick="abrirPanelPass('asis',this)">
-    <span class="m-ico">🗓️</span>
-    <span class="m-tit">Asistencia</span>
   </button>
   <button class="menu-btn" style="background:linear-gradient(145deg,#1b5e20,#43a047)" onclick="abrirPanelPass('recon',this)">
     <span class="m-ico">⭐</span>
@@ -1514,6 +1529,7 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
       <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.75rem;margin-bottom:10px">
         <span>🔴 Pendiente de subir</span>
         <span>📤 Enviada (esperando nota)</span>
+        <span>❌ Rechazada (subir otra foto)</span>
         <span>✓ Calificada</span>
       </div>
       <div id="subir-act-sel" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -1764,6 +1780,55 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
       <div id="asis-resumen-mes-tabla"></div>
       <div id="asis-resumen-permisos" style="margin-top:8px"></div>
     </div>
+  </div>
+</div>
+
+<!-- ══════ CUADERNO DE CONOCIMIENTOS ══════ -->
+<div id="sec-conoc" class="sec" style="display:none">
+  <div class="card">
+    <h2>📕 Nuevo Conocimiento</h2>
+    <p style="font-size:.8rem;color:#666;margin-bottom:12px">Registro formal de una falta grave. La numeración y la fecha son automáticas.</p>
+
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:.85rem;color:#4e342e;font-weight:700">
+      <span>📕 Conocimiento No. <span id="conoc-num-preview">—</span></span>
+      <span>📅 <span id="conoc-fecha-preview">—</span></span>
+    </div>
+
+    <label>👤 Alumno(s) involucrado(s)</label>
+    <input type="text" id="conoc-buscar-alumno" placeholder="Escribí el nombre para buscar..." autocomplete="off"
+      oninput="buscarAlumnoConocimiento(this.value)"
+      style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid #dde3ea;box-sizing:border-box;margin-bottom:4px">
+    <div id="conoc-sugerencias-alumno" style="position:relative"></div>
+    <div id="conoc-chips-alumnos" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"></div>
+    <div id="conoc-alerta-reincidencia" style="display:none;margin-bottom:10px"></div>
+
+    <label style="margin-top:10px;display:block">📝 Descripción de la falta</label>
+    <p style="font-size:.72rem;color:#999;margin:2px 0 6px">Se agregará automáticamente después de: "En la Escuela Oficial Urbana de Varones No. 1 'Abraham A. Cerezo' se deja constancia de lo siguiente:"</p>
+    <textarea id="conoc-descripcion" rows="4" placeholder="Describí lo sucedido..." oninput="detectarGravedadAutomatica(this.value)"
+      style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid #dde3ea;box-sizing:border-box;font-family:'Baloo 2',cursive;resize:vertical"></textarea>
+    <div id="conoc-sugerencia-auto" style="display:none;margin-top:8px"></div>
+
+    <label style="margin-top:10px;display:block">⚖️ Gravedad de la falta</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" id="conoc-gravedad-sel">
+      <button type="button" class="btn bgr" onclick="seleccionarGravedadConoc('leve', this)" style="padding:9px 14px;font-size:.82rem">🟡 Leve</button>
+      <button type="button" class="btn bgr" onclick="seleccionarGravedadConoc('grave', this)" style="padding:9px 14px;font-size:.82rem">🟠 Grave</button>
+      <button type="button" class="btn bgr" onclick="seleccionarGravedadConoc('muy_grave', this)" style="padding:9px 14px;font-size:.82rem">🔴 Muy Grave</button>
+    </div>
+    <div id="conoc-sugerencia-sancion" style="margin-top:10px"></div>
+
+    <button class="btn bv" onclick="guardarConocimiento()" style="margin-top:16px;width:100%;padding:13px">💾 Guardar Conocimiento</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0">📚 Libro de Conocimientos</h2>
+    </div>
+    <input type="text" id="conoc-filtro-alumno" placeholder="🔎 Ver solo los conocimientos de un alumno..." autocomplete="off"
+      oninput="filtrarConocimientosPorAlumno(this.value)"
+      style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid #dde3ea;box-sizing:border-box;margin-bottom:4px">
+    <div id="conoc-filtro-sugerencias" style="position:relative"></div>
+    <div id="conoc-filtro-activo" style="margin:8px 0;display:none"></div>
+    <div id="conoc-lista" style="display:flex;flex-direction:column;gap:14px;margin-top:10px"></div>
   </div>
 </div>
 
@@ -2453,18 +2518,124 @@ function initReportesFirebase(){
 }
 
 // Asistencia — {"YYYY-MM-DD": {alumnoId: {estado:'P'|'A'|'permiso', razon}}}
-function getAsistencia(){ return JSON.parse(localStorage.getItem(`asistencia_${bimestreActivo}`)||'{}'); }
+// NOTA: la asistencia es del ciclo escolar completo, NO depende del bimestre —
+// por eso usa una clave fija en vez de asistencia_${bimestreActivo}.
+function getAsistencia(){ return JSON.parse(localStorage.getItem('asistencia_general')||'{}'); }
 function setAsistencia(d){
-  localStorage.setItem(`asistencia_${bimestreActivo}`, JSON.stringify(d));
-  db.ref(`asistencia_${bimestreActivo}`).set(d).catch(e=>console.error(e));
+  localStorage.setItem('asistencia_general', JSON.stringify(d));
+  db.ref('asistencia_general').set(d).catch(e=>console.error(e));
 }
+let _asistenciaGeneralIniciada = false;
 function initAsistenciaFirebase(){
-  if(!bimestreActivo) return;
-  db.ref(`asistencia_${bimestreActivo}`).on('value',snap=>{
+  if(_asistenciaGeneralIniciada) return; // evitar registrar el listener más de una vez
+  _asistenciaGeneralIniciada = true;
+  migrarAsistenciaABimestreGeneral();
+  db.ref('asistencia_general').on('value',snap=>{
     const data = snap.val();
-    localStorage.setItem(`asistencia_${bimestreActivo}`, JSON.stringify(data||{}));
+    localStorage.setItem('asistencia_general', JSON.stringify(data||{}));
     if(panelActivo==='asis'){ renderAsisDiaria(); renderAsisResumenMes(); }
   });
+}
+
+// Migración única: si ya existía asistencia guardada bajo cada bimestre (asistencia_B1..B4)
+// de una versión anterior del sistema, se combina todo en asistencia_general para no perder nada.
+function migrarAsistenciaABimestreGeneral(){
+  db.ref('asistencia_general').once('value').then(snapGeneral=>{
+    const yaExiste = snapGeneral.val();
+    if(yaExiste && Object.keys(yaExiste).length>0) return; // ya migrado o ya tiene datos, no tocar
+
+    const bimIds = ['B1','B2','B3','B4'];
+    Promise.all(bimIds.map(b=>db.ref(`asistencia_${b}`).once('value'))).then(snaps=>{
+      let combinado = {};
+      snaps.forEach(s=>{
+        const d = s.val();
+        if(d) combinado = Object.assign(combinado, d);
+      });
+      if(Object.keys(combinado).length>0){
+        db.ref('asistencia_general').set(combinado).catch(e=>console.error(e));
+        localStorage.setItem('asistencia_general', JSON.stringify(combinado));
+      }
+    }).catch(e=>console.error('Error migrando asistencia:', e));
+  }).catch(e=>console.error('Error revisando asistencia_general:', e));
+}
+
+// ═══════════════════════════════════════════════
+// CUADERNO DE CONOCIMIENTOS — libro de actas de faltas graves, del ciclo completo
+// (independiente del bimestre, igual que Asistencia)
+// Estructura: { "1": {numero,fecha,alumnoIds:[],descripcion,gravedad,elaboradoPor}, "2": {...} }
+// ═══════════════════════════════════════════════
+function getConocimientos(){ return JSON.parse(localStorage.getItem('conocimientos_general')||'{}'); }
+function setConocimientos(d){
+  localStorage.setItem('conocimientos_general', JSON.stringify(d));
+  db.ref('conocimientos_general').set(d).catch(e=>console.error(e));
+}
+let _conocimientosGeneralIniciado = false;
+function initConocimientosFirebase(){
+  if(_conocimientosGeneralIniciado) return;
+  _conocimientosGeneralIniciado = true;
+  db.ref('conocimientos_general').on('value',snap=>{
+    const data = snap.val();
+    localStorage.setItem('conocimientos_general', JSON.stringify(data||{}));
+    if(panelActivo==='conoc') renderConocimientos();
+  });
+}
+
+// Sugerencia de sanción según el Acuerdo Ministerial No. 01-2011 (reformado por el 1505-2013),
+// "Normativa de Convivencia Pacífica y Disciplina para una Cultura de Paz en los Centros Educativos".
+// Es orientativo: la aplicación formal de faltas graves corresponde a la Comisión de Disciplina del centro.
+const SANCIONES_LEY_CONVIVENCIA = {
+  leve: {
+    titulo: '🟡 Falta Leve (Art. 29)',
+    texto: 'Llamada de atención VERBAL, registrada en el expediente del educando, con notificación escrita a los padres/encargados (deben firmar de enterados). La aplica el educador o el encargado de grado/sección. Reincidir en 3 faltas leves se considera falta grave.'
+  },
+  grave: {
+    titulo: '🟠 Falta Grave (Art. 30)',
+    texto: 'Llamada de atención ESCRITA, registrada en el expediente del educando. Se cita a los padres/encargados. La aplica formalmente la Comisión de Disciplina del centro educativo (no de forma unilateral por un solo maestro). Los padres son solidariamente responsables de reparar los daños que el estudiante ocasione.'
+  },
+  muy_grave: {
+    titulo: '🔴 Falta Muy Grave',
+    texto: 'Puede derivar en suspensión temporal u otras medidas mayores, siempre respetando el debido proceso, el derecho de defensa y la dignidad del estudiante, a través de la Comisión de Disciplina y la Dirección del centro educativo.'
+  }
+};
+
+// Palabras clave asociadas a ejemplos reales de los artículos 29 (leves) y 30 (graves) del
+// Acuerdo Ministerial 01-2011 y sus reformas (1505-2013). Es un apoyo automático, NO reemplaza
+// el criterio del maestro — la sugerencia siempre debe confirmarse manualmente.
+const PALABRAS_CLAVE_GRAVEDAD = {
+  muy_grave: [
+    'arma blanca','arma de fuego','pistola','navaja','cuchillo','droga','narcótico','narcotico',
+    'alcohol','bebida embriagante','abuso sexual','agresión sexual','agresion sexual',
+    'lesión grave','lesion grave','pandilla','extorsión','extorsion'
+  ],
+  grave: [
+    'dañ','romp','vandal',
+    'pornograf','material violento','incitar a la violencia',
+    'copi','fraude','plagi',
+    'falta injustificada','ausencia injustificada','ausent',
+    'insult','calumni','difam','amenaz',
+    'pele','golpe','empuj',
+    'rob','hurt','pirotécnic','pirotecnic','cohete',
+    'discrimin','burl','bullying','acos'
+  ],
+  leve: [
+    'carné','carnet','comió en clase','comiendo en clase','comer en clase','aliment',
+    'uniforme incompleto','lleg tarde','llegó tarde',
+    'entr tarde','entró tarde','vend','recaud','devolv firmad','llev firmad','falsific',
+    'platic','habl en clase','interrump','desorden en el aula','ruido en clase','no hizo caso',
+    'celular en clase'
+  ]
+};
+
+// Revisa el texto de la descripción y sugiere una gravedad según las palabras que contenga.
+// Si hay coincidencias en más de un nivel, prevalece la más grave detectada.
+function sugerirGravedadPorTexto(texto){
+  const t = (texto||'').toLowerCase();
+  if(t.trim().length < 6) return null; // muy corto para sugerir algo confiable
+  for(const nivel of ['muy_grave','grave','leve']){
+    const coincidencia = PALABRAS_CLAVE_GRAVEDAD[nivel].find(p=>t.includes(p));
+    if(coincidencia) return { nivel, palabra: coincidencia };
+  }
+  return null;
 }
 
 // Fotos de tareas subidas por los padres — {materia: {actIndex: {alumnoId: {foto, fecha}}}}
@@ -2512,7 +2683,6 @@ function seleccionarBimestre(bimId){
   initCuadernos();
   initConductaFirebase();
   initReportesFirebase();
-  initAsistenciaFirebase();
   initPromediosFirebase();
   initPuntosFirebase();
   // Traer notas reales de los OTROS bimestres desde Firebase, para que la boleta
@@ -2554,7 +2724,7 @@ function renderBimGrid(){
 // ═══════════════════════════════════════════════
 // CONSTANTES
 // ═══════════════════════════════════════════════
-const PASS = "Lima1980";
+const PASS = "Isai2014";
 // Una vez que el maestro ingresa la contraseña correcta en cualquier sección,
 // el sistema queda desbloqueado para el resto de las pestañas (no se vuelve a pedir).
 let sesionDesbloqueada = false;
@@ -2692,6 +2862,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Mostrar pantalla de inicio con selector de bimestre
   renderBimGrid();
   initPromediosFirebase();
+  initAsistenciaFirebase(); // asistencia es del ciclo completo, se activa desde ya sin depender del bimestre
+  initConocimientosFirebase(); // igual que asistencia, el cuaderno de conocimientos es del ciclo completo
   actualizarAnioDisplay();
 
   // Remover logins del DOM al imprimir
@@ -2909,6 +3081,7 @@ const PANEL_COLORES = {
   rep :'linear-gradient(90deg,#7b1fa2,#9c27b0)',
   cond:'linear-gradient(90deg,#e65100,#ff6f00)',
   asis:'linear-gradient(90deg,#01579b,#0288d1)',
+  conoc:'linear-gradient(90deg,#4e342e,#795548)',
   repac:'linear-gradient(90deg,#00695c,#00897b)',
   subir:'linear-gradient(90deg,#c2185b,#e91e63)',
   config:'linear-gradient(90deg,#263238,#455a64)',
@@ -2924,13 +3097,15 @@ const PANEL_TITULOS = {
   rep :'⚠️ Reporte Disciplinario',
   cond:'🌟 Evaluación de Conducta',
   asis:'🗓️ Asistencia',
+  conoc:'📕 Cuaderno de Conocimientos',
   repac:'📂 Reporte Académico',
   subir:'📤 Subir Tarea',
   config:'⚙️ Configuración',
   recon:'⭐ Reconocimientos y Puntos',
 };
 let panelActivo = null;
-const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','repac','subir','config','recon'];
+const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','conoc','repac','subir','config','recon'];
+
 
 function abrirPanel(sec, btn){
   if(panelActivo===sec){ cerrarPanel(); return; }
@@ -2960,6 +3135,7 @@ function abrirPanel(sec, btn){
   if(sec==='rep')    initSecRep();
   if(sec==='cond')   renderCondGrid();
   if(sec==='asis')   initAsistencia();
+  if(sec==='conoc')  renderConocimientos();
   if(sec==='repac')  renderReporteAcademico();
   if(sec==='subir')  initSubirTarea();
   if(sec==='bol')    setTimeout(()=>mostrarBoleta('imprimir'), 200);
@@ -2978,6 +3154,7 @@ function abrirPanelPass(sec, btn){
     if(sec==='rep')  initSecRep();
     if(sec==='cond') renderCondGrid();
     if(sec==='asis') initAsistencia();
+    if(sec==='conoc') renderConocimientos();
     if(sec==='bol')  setTimeout(()=>mostrarBoleta('imprimir'), 200);
     if(sec==='config') initConfig();
     if(sec==='recon') initSecRecon();
@@ -2990,11 +3167,33 @@ function abrirPanelPass(sec, btn){
 function cerrarPanel(){
   SECCIONES.forEach(s=>{ const el=document.getElementById('sec-'+s); if(el) el.style.display='none'; });
   document.getElementById('menu-panel').classList.remove('abierto');
-  const grid = document.querySelector('.menu-grid');
-  if(grid) grid.style.display='grid';
   panelActivo = null;
   window.scrollTo({top:0, behavior:'smooth'});
+
+  if(_modoFueraDeBimestre){
+    // Se entró desde la pantalla de inicio sin elegir bimestre (Asistencia o Conocimientos) — volver ahí
+    _modoFueraDeBimestre = false;
+    document.getElementById('app-principal').style.display='none';
+    document.getElementById('sec-inicio').style.display='block';
+    return;
+  }
+  const grid = document.querySelector('.menu-grid');
+  if(grid) grid.style.display='grid';
 }
+
+// Abre una sección directamente desde la pantalla de inicio, sin necesidad de elegir
+// un bimestre primero — usado por Asistencia y Conocimientos, que son del ciclo completo.
+let _modoFueraDeBimestre = false;
+function abrirSeccionFueraDeBimestre(sec){
+  _modoFueraDeBimestre = true;
+  document.getElementById('sec-inicio').style.display = 'none';
+  document.getElementById('app-principal').style.display = 'block';
+  const grid = document.querySelector('.menu-grid');
+  if(grid) grid.style.display = 'none';
+  abrirPanelPass(sec, null);
+}
+function abrirAsistenciaGeneral(){ abrirSeccionFueraDeBimestre('asis'); }
+function abrirConocimientosGeneral(){ abrirSeccionFueraDeBimestre('conoc'); }
 
 function postAuth(sec){
   const pending = window._panelPendiente;
@@ -3066,6 +3265,12 @@ function chkPassGenerico(){
 function cerrarModalPass(){
   _destruirModalPass();
   window._panelPendiente = null;
+  if(_modoFueraDeBimestre){
+    // Canceló la contraseña estando en modo Asistencia/Conocimientos desde la pantalla de inicio: volver ahí
+    _modoFueraDeBimestre = false;
+    document.getElementById('app-principal').style.display='none';
+    document.getElementById('sec-inicio').style.display='block';
+  }
 }
 
 // ── Contraseña para Cuaderno ──
@@ -3279,10 +3484,30 @@ function renderCuaderno(mat){
       if(val!=='') { total+=Number(val); conNotas++; }
       const registroFoto = getTareasFotos()?.[mat]?.[i]?.[al.id];
       const cantFotos = registroFoto ? (registroFoto.fotos ? registroFoto.fotos.length : (registroFoto.foto ? 1 : 0)) : 0;
-      const iconoFoto = cantFotos>0
-        ? `<span onclick="verFotoTarea('${mat.replace(/'/g,"\\'")}',${i},${al.id})" title="Ver ${cantFotos>1?cantFotos+' fotos':'foto'} de la tarea enviada"
-             style="display:inline-block;cursor:pointer;font-size:.85rem;margin-left:3px;vertical-align:middle">📷${cantFotos>1?`<sup style="font-size:.6rem">${cantFotos}</sup>`:''}</span>`
-        : '';
+      let iconoFoto = '';
+      if(cantFotos>0){
+        const yaCalificada = (val!=='');
+        const fueRechazada = registroFoto && registroFoto.rechazada;
+        let estilo, tituloEstado, emoji;
+        if(yaCalificada){
+          // Ya calificada: ícono atenuado (ya revisada, sigue disponible para consulta)
+          estilo = 'opacity:.35;filter:grayscale(60%)';
+          tituloEstado = ' — ya calificada';
+          emoji = '📷';
+        } else if(fueRechazada){
+          // Ya la rechazaste y sigue sin nota: esperando que suban la foto correcta, no necesita tu atención ahora
+          estilo = 'opacity:.55;filter:none';
+          tituloEstado = ` — ya la rechazaste${registroFoto.motivoRechazo?': '+registroFoto.motivoRechazo:''}, esperando que suban la correcta`;
+          emoji = '❌';
+        } else {
+          // Nueva, sin revisar: llama la atención
+          estilo = 'opacity:1;filter:none;animation:parpadeoFoto 1.4s ease-in-out infinite';
+          tituloEstado = ' — ¡pendiente de revisar!';
+          emoji = '📷';
+        }
+        iconoFoto = `<span onclick="verFotoTarea('${mat.replace(/'/g,"\\'")}',${i},${al.id})" title="Ver ${cantFotos>1?cantFotos+' fotos':'foto'} de la tarea enviada${tituloEstado}"
+             style="display:inline-block;cursor:pointer;font-size:.85rem;margin-left:3px;vertical-align:middle;${estilo}">${emoji}${cantFotos>1?`<sup style="font-size:.6rem">${cantFotos}</sup>`:''}</span>`;
+      }
       html += `<td><input type="number" class="ninp ${cls}" min="0" max="100"
         data-mat="${mat}" data-al="${al.id}" data-act="${i}"
         value="${val}" placeholder="–"
@@ -3366,6 +3591,22 @@ function actualizarNota(inp){
   inputs.forEach(i=>{ if(i.value!==''){total+=Number(i.value);con++;} });
   const tdTot = fila.querySelector('.td-tot');
   if(tdTot) tdTot.textContent = con>0?total:'–';
+
+  // Si esta celda tiene foto de tarea enviada, atenuar/resaltar el ícono según si ya se calificó
+  const iconoFoto = inp.parentElement.querySelector('span');
+  if(iconoFoto){
+    if(val!==''){
+      iconoFoto.style.opacity = '.35';
+      iconoFoto.style.filter = 'grayscale(60%)';
+      iconoFoto.style.animation = 'none';
+      iconoFoto.title = iconoFoto.title.replace('— ¡pendiente de revisar!', '— ya calificada');
+    } else {
+      iconoFoto.style.opacity = '1';
+      iconoFoto.style.filter = 'none';
+      iconoFoto.style.animation = 'parpadeoFoto 1.4s ease-in-out infinite';
+      iconoFoto.title = iconoFoto.title.replace('— ya calificada', '— ¡pendiente de revisar!');
+    }
+  }
 
   // Actualizar ranking en background
   renderRanking();
@@ -4173,16 +4414,41 @@ function verFotoTarea(mat, actIndex, alId){
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out;overflow-y:auto';
   overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
   const imgs = fotos.map((f,i)=>`<img src="${f}" style="max-width:92vw;max-height:70vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:10px" alt="Foto ${i+1} de ${fotos.length}">`).join('');
+  const avisoRechazada = registro.rechazada
+    ? `<div style="background:#fff3e0;color:#e65100;border-radius:8px;padding:8px 12px;font-size:.78rem;margin-bottom:10px;max-width:400px;text-align:center">
+        ❌ Marcada como "no corresponde"${registro.motivoRechazo ? ': '+registro.motivoRechazo : ''}
+      </div>`
+    : '';
   overlay.innerHTML = `
     <div style="color:#fff;font-family:'Baloo 2',cursive;text-align:center;margin-bottom:12px">
       <div style="font-weight:800;font-size:1.05rem">${al ? al.n : ''}</div>
       <div style="font-size:.8rem;opacity:.8">${mat} · ${fecha} ${fotos.length>1?`· ${fotos.length} fotos`:''}</div>
     </div>
+    ${avisoRechazada}
     <div style="display:flex;flex-direction:column;align-items:center">${imgs}</div>
-    <button onclick="event.stopPropagation();document.body.removeChild(document.getElementById('lightbox-foto-tarea'))"
-      style="margin-top:4px;padding:9px 20px;border-radius:20px;border:none;background:#fff;color:#333;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Cerrar</button>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
+      <button onclick="event.stopPropagation();rechazarFotoTarea('${mat.replace(/'/g,"\\'")}',${actIndex},${alId})"
+        style="padding:9px 18px;border-radius:20px;border:none;background:#ef5350;color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">❌ No corresponde — Rechazar</button>
+      <button onclick="event.stopPropagation();document.body.removeChild(document.getElementById('lightbox-foto-tarea'))"
+        style="padding:9px 20px;border-radius:20px;border:none;background:#fff;color:#333;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Cerrar</button>
+    </div>
   `;
   document.body.appendChild(overlay);
+}
+
+function rechazarFotoTarea(mat, actIndex, alId){
+  const motivo = prompt('¿Por qué no corresponde esta foto? (opcional, se le mostrará al alumno/padre)', '');
+  if(motivo===null) return; // canceló
+  const path = `tareasfotos_${bimestreActivo}/${mat}/${actIndex}/${alId}`;
+  db.ref(path).update({ rechazada: true, motivoRechazo: motivo.trim() })
+    .then(()=>{
+      const overlay = document.getElementById('lightbox-foto-tarea');
+      if(overlay) document.body.removeChild(overlay);
+    })
+    .catch(e=>{
+      alert('No se pudo marcar como rechazada. Revisa tu conexión e intenta de nuevo.');
+      console.error(e);
+    });
 }
 
 // ═══════════════════════════════════════════════
@@ -4256,17 +4522,22 @@ function seleccionarMateriaSubirTarea(mat, btn){
     cont.innerHTML = '<p style="font-size:.82rem;color:#888">El maestro todavía no ha creado actividades en esta materia.</p>';
   } else {
     cont.innerHTML = acts.map((a,i)=>{
-      // Estado de ESTE alumno para esta actividad: calificada / enviada (esperando nota) / pendiente de subir
+      // Estado de ESTE alumno para esta actividad: calificada / rechazada / enviada (esperando nota) / pendiente de subir
       const notaRaw = c[mat]?.notas?.[`${alId}_${i}`];
       const nota = getNota(notaRaw);
       const yaCalificada = (nota!==undefined && nota!==null && nota!=='');
       const registroFoto = getTareasFotos()?.[mat]?.[i]?.[alId];
       const yaEnviada = registroFoto && ((registroFoto.fotos && registroFoto.fotos.length>0) || registroFoto.foto);
+      const fueRechazada = registroFoto && registroFoto.rechazada;
 
       let badge, borde;
       if(yaCalificada){
-        badge = '<span style="background:#4caf50;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">✓ Calificada</span>';
+        badge = `<span style="background:#4caf50;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">✓ Calificada: ${nota}</span>`;
         borde = 'border-left:5px solid #4caf50';
+      } else if(fueRechazada){
+        const motivoTxt = registroFoto.motivoRechazo ? `: ${registroFoto.motivoRechazo}` : '';
+        badge = `<span style="background:#ef5350;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px" title="No corresponde${motivoTxt}">❌ Rechazada — subí la foto correcta</span>`;
+        borde = 'border-left:5px solid #ef5350';
       } else if(yaEnviada){
         badge = '<span style="background:#ffa726;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">📤 Enviada</span>';
         borde = 'border-left:5px solid #ffa726';
@@ -5713,6 +5984,264 @@ function descargarAsistenciaPDF(){
   </div>`;
   document.body.dataset.printing='1';
   setTimeout(()=>{ window.print(); document.body.dataset.printing=''; pw.innerHTML=''; }, 200);
+}
+
+// ═══════════════════════════════════════════════
+// CUADERNO DE CONOCIMIENTOS
+// ═══════════════════════════════════════════════
+const UMBRAL_ALERTA_CONOCIMIENTOS = 2; // más de 2 conocimientos acumulados dispara la alerta
+let _conocFormAlumnos = [];
+let _conocFormGravedad = null;
+let _conocFiltroAlumnoId = null;
+
+function siguienteNumeroConocimiento(){
+  const data = getConocimientos();
+  const nums = Object.keys(data).map(k=>parseInt(k)).filter(n=>!isNaN(n));
+  return nums.length>0 ? Math.max(...nums)+1 : 1;
+}
+
+function contarConocimientosPorAlumno(alId, excluirNumero){
+  const data = getConocimientos();
+  let cuenta = 0;
+  Object.keys(data).forEach(num=>{
+    if(excluirNumero && num===String(excluirNumero)) return;
+    const c = data[num];
+    if(c.alumnoIds && c.alumnoIds.includes(alId)) cuenta++;
+  });
+  return cuenta;
+}
+
+function renderConocimientos(){
+  _conocFormAlumnos = [];
+  _conocFormGravedad = null;
+  _conocFiltroAlumnoId = null;
+  document.getElementById('conoc-num-preview').textContent = siguienteNumeroConocimiento();
+  document.getElementById('conoc-fecha-preview').textContent = new Date().toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('conoc-descripcion').value = '';
+  document.getElementById('conoc-buscar-alumno').value = '';
+  document.getElementById('conoc-filtro-alumno').value = '';
+  document.getElementById('conoc-filtro-activo').style.display = 'none';
+  document.getElementById('conoc-sugerencia-sancion').innerHTML = '';
+  document.getElementById('conoc-sugerencia-auto').style.display = 'none';
+  document.getElementById('conoc-sugerencia-auto').innerHTML = '';
+  document.querySelectorAll('#conoc-gravedad-sel button').forEach(b=>{ b.classList.remove('bv'); b.classList.add('bgr'); });
+  renderChipsAlumnosConoc();
+  renderListaConocimientos();
+}
+
+// ── Buscador de alumno para el FORMULARIO (agregar a la falta) ──
+function buscarAlumnoConocimiento(texto){
+  const cont = document.getElementById('conoc-sugerencias-alumno');
+  const t = texto.trim().toLowerCase();
+  if(t===''){ cont.innerHTML=''; return; }
+  const encontrados = ALUMNOS.filter(a=>a.n.toLowerCase().includes(t) && !_conocFormAlumnos.includes(a.id)).slice(0,8);
+  if(encontrados.length===0){
+    cont.innerHTML = '<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;padding:8px 12px;font-size:.8rem;color:#888;width:100%;box-sizing:border-box">Sin coincidencias</div>';
+    return;
+  }
+  cont.innerHTML = `<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.12);width:100%;box-sizing:border-box;max-height:220px;overflow-y:auto">
+    ${encontrados.map(a=>`<div onclick="agregarAlumnoConoc(${a.id})" style="padding:9px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f0f0f0">${a.em} ${a.n}</div>`).join('')}
+  </div>`;
+}
+
+function agregarAlumnoConoc(alId){
+  if(!_conocFormAlumnos.includes(alId)) _conocFormAlumnos.push(alId);
+  document.getElementById('conoc-buscar-alumno').value = '';
+  document.getElementById('conoc-sugerencias-alumno').innerHTML = '';
+  renderChipsAlumnosConoc();
+}
+
+function quitarAlumnoConoc(alId){
+  _conocFormAlumnos = _conocFormAlumnos.filter(id=>id!==alId);
+  renderChipsAlumnosConoc();
+}
+
+function renderChipsAlumnosConoc(){
+  const cont = document.getElementById('conoc-chips-alumnos');
+  cont.innerHTML = _conocFormAlumnos.map(id=>{
+    const a = ALUMNOS.find(x=>x.id===id);
+    if(!a) return '';
+    return `<span style="display:inline-flex;align-items:center;gap:5px;background:#efebe9;border-radius:20px;padding:5px 12px;font-size:.8rem;font-weight:700;color:#4e342e">
+      ${a.em} ${a.n} <span onclick="quitarAlumnoConoc(${id})" style="cursor:pointer;color:#c62828;font-weight:900">✕</span>
+    </span>`;
+  }).join('');
+
+  // Alerta de reincidencia: si alguno de los alumnos seleccionados ya acumula más de 2 conocimientos
+  const alertaCont = document.getElementById('conoc-alerta-reincidencia');
+  const reincidentes = _conocFormAlumnos
+    .map(id=>({al: ALUMNOS.find(a=>a.id===id), cuenta: contarConocimientosPorAlumno(id)}))
+    .filter(x=>x.al && x.cuenta > UMBRAL_ALERTA_CONOCIMIENTOS);
+  if(reincidentes.length>0){
+    alertaCont.style.display = 'block';
+    alertaCont.innerHTML = reincidentes.map(r=>
+      `<div style="background:#ffebee;border-left:4px solid #c62828;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#b71c1c;font-weight:700">
+        ⚠️ ${r.al.em} ${r.al.n} ya acumula ${r.cuenta} conocimientos este ciclo escolar — reincidencia.
+      </div>`
+    ).join('');
+  } else {
+    alertaCont.style.display = 'none';
+    alertaCont.innerHTML = '';
+  }
+}
+
+// ── Gravedad y sugerencia de sanción ──
+function seleccionarGravedadConoc(gravedad, btn){
+  _conocFormGravedad = gravedad;
+  document.querySelectorAll('#conoc-gravedad-sel button').forEach(b=>{ b.classList.remove('bv'); b.classList.add('bgr'); });
+  if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
+  const info = SANCIONES_LEY_CONVIVENCIA[gravedad];
+  const cont = document.getElementById('conoc-sugerencia-sancion');
+  cont.innerHTML = `<div style="background:#efebe9;border-left:4px solid #795548;border-radius:8px;padding:10px 14px;font-size:.8rem">
+    <strong>${info.titulo}</strong><br>${info.texto}
+    <div style="font-size:.68rem;color:#999;margin-top:6px">📖 Orientativo, según el Acuerdo Ministerial No. 01-2011 (reformado por el 1505-2013). Las faltas graves deben aplicarse formalmente a través de la Comisión de Disciplina del centro educativo.</div>
+  </div>`;
+  // Si el maestro elige manualmente, ocultamos la sugerencia automática (ya no hace falta)
+  document.getElementById('conoc-sugerencia-auto').style.display = 'none';
+}
+
+// Analiza lo que se va escribiendo en la descripción y sugiere una gravedad,
+// según palabras asociadas a ejemplos reales de la ley. Nunca selecciona sola —
+// el maestro siempre debe confirmar con un clic.
+function detectarGravedadAutomatica(texto){
+  const cont = document.getElementById('conoc-sugerencia-auto');
+  // Si ya eligió una gravedad manualmente, no lo interrumpimos con sugerencias
+  if(_conocFormGravedad){ cont.style.display='none'; return; }
+
+  const resultado = sugerirGravedadPorTexto(texto);
+  if(!resultado){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  const info = SANCIONES_LEY_CONVIVENCIA[resultado.nivel];
+  const colores = { leve:'#fbc02d', grave:'#fb8c00', muy_grave:'#e53935' };
+  cont.style.display = 'block';
+  cont.innerHTML = `<div style="background:#fff8e1;border-left:4px solid ${colores[resultado.nivel]};border-radius:8px;padding:10px 14px;font-size:.78rem">
+    💡 <strong>Sugerencia automática:</strong> por la palabra "${resultado.palabra}", esto podría ser una <strong>${info.titulo}</strong>.
+    <button type="button" onclick="aceptarSugerenciaGravedad('${resultado.nivel}')" class="btn bv" style="margin-left:8px;padding:4px 12px;font-size:.72rem">Usar esta sugerencia</button>
+    <div style="font-size:.68rem;color:#999;margin-top:4px">Es solo una guía automática — revisá y confirmá vos la gravedad real.</div>
+  </div>`;
+}
+
+function aceptarSugerenciaGravedad(nivel){
+  const btnCorrespondiente = Array.from(document.querySelectorAll('#conoc-gravedad-sel button'))
+    .find(b=>b.getAttribute('onclick').includes(`'${nivel}'`));
+  seleccionarGravedadConoc(nivel, btnCorrespondiente);
+}
+
+
+// ── Guardar ──
+function guardarConocimiento(){
+  const descripcion = document.getElementById('conoc-descripcion').value.trim();
+  if(!descripcion){ alert('Por favor escribe la descripción de la falta.'); return; }
+
+  const numero = siguienteNumeroConocimiento();
+  const data = getConocimientos();
+  data[numero] = {
+    numero,
+    fecha: Date.now(),
+    alumnoIds: [..._conocFormAlumnos],
+    descripcion,
+    gravedad: _conocFormGravedad,
+    elaboradoPor: 'Prof. Marco Antonio Lima Ortiz'
+  };
+  setConocimientos(data);
+  renderConocimientos();
+}
+
+function eliminarConocimiento(numero){
+  if(!confirm(`¿Eliminar el Conocimiento No. ${numero}? Esta acción no se puede deshacer.`)) return;
+  const data = getConocimientos();
+  delete data[numero];
+  setConocimientos(data);
+  renderConocimientos();
+}
+
+// ── Lista / libro de conocimientos ──
+function renderListaConocimientos(){
+  const cont = document.getElementById('conoc-lista');
+  const data = getConocimientos();
+  let entradas = Object.values(data).sort((a,b)=>b.numero-a.numero); // más reciente primero
+
+  if(_conocFiltroAlumnoId){
+    entradas = entradas.filter(c=>c.alumnoIds && c.alumnoIds.includes(_conocFiltroAlumnoId));
+  }
+
+  if(entradas.length===0){
+    cont.innerHTML = '<p style="font-size:.85rem;color:#888;text-align:center;padding:20px">Todavía no hay conocimientos registrados.</p>';
+    return;
+  }
+
+  cont.innerHTML = entradas.map(c=>{
+    const fechaTxt = new Date(c.fecha).toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    const alumnosTxt = (c.alumnoIds && c.alumnoIds.length>0)
+      ? c.alumnoIds.map(id=>{ const a=ALUMNOS.find(x=>x.id===id); return a ? `${a.em} ${a.n}` : ''; }).filter(Boolean).join(', ')
+      : '(sin alumno específico)';
+    const info = c.gravedad ? SANCIONES_LEY_CONVIVENCIA[c.gravedad] : null;
+    const reincidenciasHtml = (c.alumnoIds||[]).map(id=>{
+      const cuenta = contarConocimientosPorAlumno(id);
+      if(cuenta > UMBRAL_ALERTA_CONOCIMIENTOS){
+        const a = ALUMNOS.find(x=>x.id===id);
+        return `<div style="background:#ffebee;border-left:4px solid #c62828;border-radius:6px;padding:6px 10px;font-size:.72rem;color:#b71c1c;font-weight:700;margin-top:6px">⚠️ ${a?a.n:''} acumula ${cuenta} conocimientos este ciclo — reincidencia.</div>`;
+      }
+      return '';
+    }).join('');
+
+    return `<div style="background:#fdfaf6;border:1.5px solid #e6ddd0;border-radius:12px;padding:16px;font-family:'Baloo 2',cursive">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <strong style="color:#4e342e">📕 Conocimiento No. ${c.numero}</strong>
+        <span style="color:#888;font-size:.8rem;text-transform:capitalize">${fechaTxt}</span>
+      </div>
+      <div style="border-top:1px dashed #d7cbb8;border-bottom:1px dashed #d7cbb8;padding:10px 0;margin-bottom:10px;font-size:.85rem;line-height:1.5">
+        <em>En la Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo" se deja constancia de lo siguiente:</em><br><br>
+        ${c.descripcion.replace(/\n/g,'<br>')}
+      </div>
+      <div style="font-size:.82rem;margin-bottom:4px"><strong>Alumno(s) involucrado(s):</strong> ${alumnosTxt}</div>
+      ${info ? `<div style="font-size:.82rem;margin-bottom:4px"><strong>Gravedad:</strong> ${info.titulo}</div>
+        <div style="background:#efebe9;border-radius:8px;padding:8px 12px;font-size:.76rem;margin-bottom:6px">${info.texto}</div>` : ''}
+      ${reincidenciasHtml}
+      <div style="font-size:.78rem;color:#888;margin-top:8px">Elaborado por: ${c.elaboradoPor}</div>
+      <button onclick="eliminarConocimiento(${c.numero})" class="btn bro" style="margin-top:10px;padding:6px 14px;font-size:.72rem">🗑️ Eliminar</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Buscador para VER el historial de un alumno en particular ──
+function filtrarConocimientosPorAlumno(texto){
+  const cont = document.getElementById('conoc-filtro-sugerencias');
+  const t = texto.trim().toLowerCase();
+  if(t===''){ cont.innerHTML=''; return; }
+  const encontrados = ALUMNOS.filter(a=>a.n.toLowerCase().includes(t)).slice(0,8);
+  if(encontrados.length===0){
+    cont.innerHTML = '<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;padding:8px 12px;font-size:.8rem;color:#888;width:100%;box-sizing:border-box">Sin coincidencias</div>';
+    return;
+  }
+  cont.innerHTML = `<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.12);width:100%;box-sizing:border-box;max-height:220px;overflow-y:auto">
+    ${encontrados.map(a=>{
+      const cuenta = contarConocimientosPorAlumno(a.id);
+      return `<div onclick="verHistorialAlumnoConoc(${a.id})" style="padding:9px 12px;cursor:pointer;font-size:.85rem;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between">
+        <span>${a.em} ${a.n}</span>
+        ${cuenta>0 ? `<span style="color:${cuenta>UMBRAL_ALERTA_CONOCIMIENTOS?'#c62828':'#888'};font-weight:700">${cuenta}</span>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function verHistorialAlumnoConoc(alId){
+  _conocFiltroAlumnoId = alId;
+  const a = ALUMNOS.find(x=>x.id===alId);
+  document.getElementById('conoc-filtro-alumno').value = '';
+  document.getElementById('conoc-filtro-sugerencias').innerHTML = '';
+  const activo = document.getElementById('conoc-filtro-activo');
+  const cuenta = contarConocimientosPorAlumno(alId);
+  activo.style.display = 'block';
+  activo.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;background:#efebe9;border-radius:20px;padding:7px 14px;font-size:.82rem;font-weight:700;color:#4e342e">
+    Mostrando historial de: ${a.em} ${a.n} (${cuenta}) <span onclick="quitarFiltroConoc()" style="cursor:pointer;color:#c62828;font-weight:900">✕</span>
+  </span>`;
+  renderListaConocimientos();
+}
+
+function quitarFiltroConoc(){
+  _conocFiltroAlumnoId = null;
+  document.getElementById('conoc-filtro-activo').style.display = 'none';
+  renderListaConocimientos();
 }
 
 // ═══════════════════════════════════════════════
