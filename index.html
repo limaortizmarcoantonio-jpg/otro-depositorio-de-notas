@@ -1260,6 +1260,15 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
       <span class="m-tit">Abrir Cuaderno de Conocimientos</span>
     </button>
   </div>
+
+  <div class="card" style="text-align:center;padding:20px">
+    <h2 style="justify-content:center;font-size:1.2rem">📜 Actas Suscritas</h2>
+    <p style="font-size:.84rem;color:#666;margin-bottom:16px">Vaciado directo de todos los conocimientos ya guardados, solo para consultarlos — se conecta directo a la base de datos cada vez que la abrís.</p>
+    <button class="menu-btn" style="background:linear-gradient(145deg,#3e2723,#5d4037);max-width:260px;margin:0 auto" onclick="abrirActasSuscritasGeneral()">
+      <span class="m-ico">📜</span>
+      <span class="m-tit">Abrir Actas Suscritas</span>
+    </button>
+  </div>
 </div>
 
 <div id="app-principal" style="display:none">
@@ -1829,6 +1838,19 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <div id="conoc-filtro-sugerencias" style="position:relative"></div>
     <div id="conoc-filtro-activo" style="margin:8px 0;display:none"></div>
     <div id="conoc-lista" style="display:flex;flex-direction:column;gap:14px;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ══════ ACTAS SUSCRITAS — vaciado simple de todos los conocimientos ══════ -->
+<div id="sec-actas" class="sec" style="display:none">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h2 style="margin:0">📜 Actas Suscritas</h2>
+      <button class="btn bv" onclick="renderActasSuscritas()" style="padding:9px 16px;font-size:.8rem">🔄 Actualizar</button>
+    </div>
+    <p style="font-size:.82rem;color:#666;margin-bottom:14px">Vaciado directo de todos los conocimientos guardados, del más reciente al más antiguo. Se conecta a la base de datos cada vez que abrís esta pantalla o presionás "Actualizar".</p>
+    <div id="actas-estado" style="font-size:.82rem;color:#888;margin-bottom:10px"></div>
+    <div id="actas-lista" style="display:flex;flex-direction:column;gap:14px"></div>
   </div>
 </div>
 
@@ -2612,7 +2634,10 @@ const PALABRAS_CLAVE_GRAVEDAD = {
     'pornograf','material violento','incitar a la violencia',
     'copi','fraude','plagi',
     'falta injustificada','ausencia injustificada','ausent',
-    'insult','calumni','difam','amenaz',
+    'insult','calumni','difam','amenaz','falt el respeto','faltó el respeto','falta de respeto',
+    'faltando el respeto','falta al respeto','faltó al respeto','le faltó al respeto','irrespet',
+    'contestó de mala manera','respondió de mala manera','desafió al maestro','desafio al maestro',
+    'agred','agres',
     'pele','golpe','empuj',
     'rob','hurt','pirotécnic','pirotecnic','cohete',
     'discrimin','burl','bullying','acos'
@@ -2631,6 +2656,13 @@ const PALABRAS_CLAVE_GRAVEDAD = {
 function sugerirGravedadPorTexto(texto){
   const t = (texto||'').toLowerCase();
   if(t.trim().length < 6) return null; // muy corto para sugerir algo confiable
+
+  // Caso especial: "faltar el/al respeto" en cualquier forma (faltó, faltando, falta...)
+  // no siempre queda pegado como frase exacta, así que revisamos ambas palabras por separado.
+  if(t.includes('respeto') && /falt/.test(t)){
+    return { nivel:'grave', palabra:'falta de respeto' };
+  }
+
   for(const nivel of ['muy_grave','grave','leve']){
     const coincidencia = PALABRAS_CLAVE_GRAVEDAD[nivel].find(p=>t.includes(p));
     if(coincidencia) return { nivel, palabra: coincidencia };
@@ -3082,6 +3114,7 @@ const PANEL_COLORES = {
   cond:'linear-gradient(90deg,#e65100,#ff6f00)',
   asis:'linear-gradient(90deg,#01579b,#0288d1)',
   conoc:'linear-gradient(90deg,#4e342e,#795548)',
+  actas:'linear-gradient(90deg,#3e2723,#5d4037)',
   repac:'linear-gradient(90deg,#00695c,#00897b)',
   subir:'linear-gradient(90deg,#c2185b,#e91e63)',
   config:'linear-gradient(90deg,#263238,#455a64)',
@@ -3098,13 +3131,14 @@ const PANEL_TITULOS = {
   cond:'🌟 Evaluación de Conducta',
   asis:'🗓️ Asistencia',
   conoc:'📕 Cuaderno de Conocimientos',
+  actas:'📜 Actas Suscritas',
   repac:'📂 Reporte Académico',
   subir:'📤 Subir Tarea',
   config:'⚙️ Configuración',
   recon:'⭐ Reconocimientos y Puntos',
 };
 let panelActivo = null;
-const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','conoc','repac','subir','config','recon'];
+const SECCIONES = ['rank','cuad','pad','reg','impr','bol','rep','cond','asis','conoc','actas','repac','subir','config','recon'];
 
 
 function abrirPanel(sec, btn){
@@ -3136,6 +3170,7 @@ function abrirPanel(sec, btn){
   if(sec==='cond')   renderCondGrid();
   if(sec==='asis')   initAsistencia();
   if(sec==='conoc')  renderConocimientos();
+  if(sec==='actas')  renderActasSuscritas();
   if(sec==='repac')  renderReporteAcademico();
   if(sec==='subir')  initSubirTarea();
   if(sec==='bol')    setTimeout(()=>mostrarBoleta('imprimir'), 200);
@@ -3155,6 +3190,7 @@ function abrirPanelPass(sec, btn){
     if(sec==='cond') renderCondGrid();
     if(sec==='asis') initAsistencia();
     if(sec==='conoc') renderConocimientos();
+    if(sec==='actas') renderActasSuscritas();
     if(sec==='bol')  setTimeout(()=>mostrarBoleta('imprimir'), 200);
     if(sec==='config') initConfig();
     if(sec==='recon') initSecRecon();
@@ -3194,6 +3230,7 @@ function abrirSeccionFueraDeBimestre(sec){
 }
 function abrirAsistenciaGeneral(){ abrirSeccionFueraDeBimestre('asis'); }
 function abrirConocimientosGeneral(){ abrirSeccionFueraDeBimestre('conoc'); }
+function abrirActasSuscritasGeneral(){ abrirSeccionFueraDeBimestre('actas'); }
 
 function postAuth(sec){
   const pending = window._panelPendiente;
@@ -3759,12 +3796,14 @@ function verDetalleAlumno(id){
     totalActs+=acts.length;
     acts.forEach((_,i)=>{
       const vRaw=datos.notas[`${id}_${i}`]; const v=getNota(vRaw);
+      const fotoReg = getTareasFotos()?.[mat]?.[i]?.[id];
+      const subioFoto = fotoReg && ((fotoReg.fotos && fotoReg.fotos.length>0) || fotoReg.foto);
       if(v===null||v===undefined||vRaw===undefined||vRaw===null||vRaw===''){
         // Sin calificar — no cuenta
-      } else if(Number(v)===0){
-        noEntregadas++; // Calificada con 0 = no entregada
+      } else if(Number(v)===0 && !subioFoto){
+        noEntregadas++; // Calificada con 0 y SIN foto subida = no entregada de verdad
       } else {
-        sumaNotas+=Number(v); hechas++; // Entregada con nota > 0
+        sumaNotas+=Number(v); hechas++; // Entregada: nota > 0, o nota = 0 pero CON foto subida
       }
     });
   });
@@ -3873,9 +3912,11 @@ function verDetalleAlumno(id){
     let totalMat=0, conMat=0, noEntMat=0;
     const filas = acts.map((a,i)=>{
       const vRaw=datos.notas[`${id}_${i}`]; const v=getNota(vRaw);
+      const fotoReg = getTareasFotos()?.[mat]?.[i]?.[id];
+      const subioFoto = fotoReg && ((fotoReg.fotos && fotoReg.fotos.length>0) || fotoReg.foto);
       const sinCalif = vRaw===undefined||vRaw===null||vRaw==='';
-      const noEntreg = !sinCalif && Number(v)===0;
-      const entregada = !sinCalif && Number(v)>0;
+      const noEntreg = !sinCalif && Number(v)===0 && !subioFoto;
+      const entregada = !sinCalif && !noEntreg; // nota > 0, o nota = 0 pero CON foto subida
 
       if(entregada){totalMat+=Number(v);conMat++;}
       if(noEntreg) noEntMat++;
@@ -4306,10 +4347,14 @@ function renderReporteAcademico(){
     const bg = idx%2===0 ? '#fafafa' : '#fff';
     const iconos = actividadesHoy.map((item,i)=>{
       const v = item.notas[`${al.id}_${item.indice}`];
-      const entrego = (v!==null && v!==undefined && v!=='');
+      const tieneNota = (v!==null && v!==undefined && v!=='');
+      const fotoReg = getTareasFotos()?.[item.materia]?.[item.indice]?.[al.id];
+      const subioFoto = fotoReg && ((fotoReg.fotos && fotoReg.fotos.length>0) || fotoReg.foto);
+      // Un 0 sin foto subida es un marcador de "no entregó", no una entrega real
+      const entrego = tieneNota && !(Number(v)===0 && !subioFoto);
       if(entrego) return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#4caf50;color:#fff;font-weight:800;font-size:.75rem" title="Entregada">✓</span>';
       if(actividadPendiente[i]) return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#bdbdbd;color:#fff;font-weight:800;font-size:.68rem" title="Pendiente de calificar">⏳</span>';
-      return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#ef5350;color:#fff;font-weight:800;font-size:.75rem" title="No entregada">✕</span>';
+      return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#ef5350;color:#fff;font-weight:800;font-size:.75rem" title="No entregada — todavía se puede subir">✕</span>';
     }).join(' ');
     html += `<div style="display:flex;align-items:center;gap:12px;padding:10px;background:${bg};border-radius:10px;flex-wrap:wrap">
       <span style="font-size:1.6rem">${al.em}</span>
@@ -4332,7 +4377,11 @@ function renderReporteAcademico(){
   ALUMNOS.forEach(al=>{
     const marcas = actividadesHoy.map((item,i)=>{
       const v = item.notas[`${al.id}_${item.indice}`];
-      if(v!==null && v!==undefined && v!=='') return '✅';
+      const tieneNota = (v!==null && v!==undefined && v!=='');
+      const fotoReg = getTareasFotos()?.[item.materia]?.[item.indice]?.[al.id];
+      const subioFoto = fotoReg && ((fotoReg.fotos && fotoReg.fotos.length>0) || fotoReg.foto);
+      const entrego = tieneNota && !(Number(v)===0 && !subioFoto);
+      if(entrego) return '✅';
       return actividadPendiente[i] ? '⏳' : '❌';
     }).join(' ');
     texto += `${al.em} ${al.av}: ${marcas}\n`;
@@ -4411,20 +4460,31 @@ function verFotoTarea(mat, actIndex, alId){
 
   const overlay = document.createElement('div');
   overlay.id = 'lightbox-foto-tarea';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out;overflow-y:auto';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;flex-direction:column;align-items:center;padding:20px;overflow:auto';
   overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
-  const imgs = fotos.map((f,i)=>`<img src="${f}" style="max-width:92vw;max-height:70vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:10px" alt="Foto ${i+1} de ${fotos.length}">`).join('');
+
+  const imgs = fotos.map((f,i)=>`
+    <div class="foto-zoom-wrap" data-idx="${i}" style="overflow:hidden;max-width:92vw;max-height:65vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:10px;position:relative;background:#111;display:flex;align-items:center;justify-content:center;cursor:zoom-in">
+      <span class="foto-zoom-nivel" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:.7rem;padding:3px 8px;border-radius:12px;font-family:'Baloo 2',cursive;z-index:2;pointer-events:none">100%</span>
+      <img src="${f}" style="max-width:100%;max-height:65vh;display:block;transition:transform .12s ease;transform-origin:center center;user-select:none;-webkit-user-drag:none" alt="Foto ${i+1} de ${fotos.length}" draggable="false">
+    </div>`).join('');
   const avisoRechazada = registro.rechazada
     ? `<div style="background:#fff3e0;color:#e65100;border-radius:8px;padding:8px 12px;font-size:.78rem;margin-bottom:10px;max-width:400px;text-align:center">
         ❌ Marcada como "no corresponde"${registro.motivoRechazo ? ': '+registro.motivoRechazo : ''}
       </div>`
     : '';
   overlay.innerHTML = `
-    <div style="color:#fff;font-family:'Baloo 2',cursive;text-align:center;margin-bottom:12px">
+    <div style="color:#fff;font-family:'Baloo 2',cursive;text-align:center;margin-bottom:10px">
       <div style="font-weight:800;font-size:1.05rem">${al ? al.n : ''}</div>
       <div style="font-size:.8rem;opacity:.8">${mat} · ${fecha} ${fotos.length>1?`· ${fotos.length} fotos`:''}</div>
     </div>
     ${avisoRechazada}
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;justify-content:center">
+      <button type="button" class="btn-zoom-out" style="padding:7px 14px;border-radius:20px;border:none;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">➖ Alejar</button>
+      <button type="button" class="btn-zoom-in" style="padding:7px 14px;border-radius:20px;border:none;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">➕ Acercar</button>
+      <button type="button" class="btn-zoom-reset" style="padding:7px 14px;border-radius:20px;border:none;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">↺ Restablecer</button>
+    </div>
+    <div style="font-size:.7rem;color:#ccc;margin-bottom:8px;text-align:center">💡 Click en la foto para acercar, rueda del mouse para hacer zoom, arrastrá para mover</div>
     <div style="display:flex;flex-direction:column;align-items:center">${imgs}</div>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
       <button onclick="event.stopPropagation();rechazarFotoTarea('${mat.replace(/'/g,"\\'")}',${actIndex},${alId})"
@@ -4434,6 +4494,78 @@ function verFotoTarea(mat, actIndex, alId){
     </div>
   `;
   document.body.appendChild(overlay);
+  activarZoomFotosTarea(overlay);
+}
+
+// Da zoom independiente a cada foto dentro del visor: click para acercar/alejar,
+// rueda del mouse (computadora), y arrastrar para mover cuando está ampliada.
+function activarZoomFotosTarea(overlay){
+  const wraps = overlay.querySelectorAll('.foto-zoom-wrap');
+  let wrapActivo = null; // para que los botones ➕➖↺ apliquen a la última foto tocada
+
+  wraps.forEach(wrap=>{
+    const img = wrap.querySelector('img');
+    const nivelSpan = wrap.querySelector('.foto-zoom-nivel');
+    let escala = 1, panX = 0, panY = 0;
+    let arrastrando = false, startX = 0, startY = 0;
+
+    function aplicar(){
+      img.style.transform = `scale(${escala}) translate(${panX/escala}px, ${panY/escala}px)`;
+      nivelSpan.textContent = Math.round(escala*100)+'%';
+      wrap.style.cursor = escala>1 ? 'grab' : 'zoom-in';
+    }
+    wrap._zoomIn    = ()=>{ escala = Math.min(4, escala+0.5); aplicar(); };
+    wrap._zoomOut   = ()=>{ escala = Math.max(1, escala-0.5); if(escala===1){panX=0;panY=0;} aplicar(); };
+    wrap._zoomReset = ()=>{ escala = 1; panX = 0; panY = 0; aplicar(); };
+
+    wrap.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      wrapActivo = wrap;
+      if(arrastrando) return; // evitar que soltar el arrastre dispare también un toggle de zoom
+      if(escala===1){ escala = 2.5; } else { escala = 1; panX = 0; panY = 0; }
+      aplicar();
+    });
+    wrap.addEventListener('wheel', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      wrapActivo = wrap;
+      escala = e.deltaY < 0 ? Math.min(4, escala+0.3) : Math.max(1, escala-0.3);
+      if(escala===1){ panX=0; panY=0; }
+      aplicar();
+    }, {passive:false});
+    wrap.addEventListener('mousedown', (e)=>{
+      if(escala<=1) return;
+      arrastrando = true;
+      startX = e.clientX - panX; startY = e.clientY - panY;
+      wrap.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e)=>{
+      if(!arrastrando) return;
+      panX = e.clientX - startX; panY = e.clientY - startY;
+      aplicar();
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(arrastrando){ arrastrando = false; if(escala>1) wrap.style.cursor='grab'; setTimeout(()=>{ arrastrando=false; }, 0); }
+    });
+    // Soporte táctil básico para mover la imagen ampliada en celular/tablet
+    wrap.addEventListener('touchstart', (e)=>{
+      if(escala<=1 || e.touches.length!==1) return;
+      const t = e.touches[0];
+      startX = t.clientX - panX; startY = t.clientY - panY;
+      arrastrando = true;
+    }, {passive:true});
+    wrap.addEventListener('touchmove', (e)=>{
+      if(!arrastrando || e.touches.length!==1) return;
+      const t = e.touches[0];
+      panX = t.clientX - startX; panY = t.clientY - startY;
+      aplicar();
+    }, {passive:true});
+    wrap.addEventListener('touchend', ()=>{ arrastrando=false; });
+  });
+
+  overlay.querySelector('.btn-zoom-in').onclick    = (e)=>{ e.stopPropagation(); (wrapActivo||wraps[0])._zoomIn(); };
+  overlay.querySelector('.btn-zoom-out').onclick   = (e)=>{ e.stopPropagation(); (wrapActivo||wraps[0])._zoomOut(); };
+  overlay.querySelector('.btn-zoom-reset').onclick = (e)=>{ e.stopPropagation(); (wrapActivo||wraps[0])._zoomReset(); };
 }
 
 function rechazarFotoTarea(mat, actIndex, alId){
@@ -4525,15 +4657,22 @@ function seleccionarMateriaSubirTarea(mat, btn){
       // Estado de ESTE alumno para esta actividad: calificada / rechazada / enviada (esperando nota) / pendiente de subir
       const notaRaw = c[mat]?.notas?.[`${alId}_${i}`];
       const nota = getNota(notaRaw);
-      const yaCalificada = (nota!==undefined && nota!==null && nota!=='');
+      const tieneNota = (nota!==undefined && nota!==null && nota!=='');
       const registroFoto = getTareasFotos()?.[mat]?.[i]?.[alId];
       const yaEnviada = registroFoto && ((registroFoto.fotos && registroFoto.fotos.length>0) || registroFoto.foto);
       const fueRechazada = registroFoto && registroFoto.rechazada;
+      // Un 0 puesto SIN que el alumno haya subido nada es un marcador de "no entregó", no una
+      // calificación real — no debe verse como algo ya resuelto, sino como que TODAVÍA puede subir.
+      const esCeroSinEntregar = tieneNota && Number(nota)===0 && !yaEnviada;
+      const yaCalificada = tieneNota && !esCeroSinEntregar;
 
       let badge, borde;
       if(yaCalificada){
         badge = `<span style="background:#4caf50;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px">✓ Calificada: ${nota}</span>`;
         borde = 'border-left:5px solid #4caf50';
+      } else if(esCeroSinEntregar){
+        badge = `<span style="background:#ef5350;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px" title="El maestro puso 0 porque todavía no se sube la tarea">⚠️ Sin entregar (0) — ¡Todavía podés subirla!</span>`;
+        borde = 'border-left:5px solid #ef5350';
       } else if(fueRechazada){
         const motivoTxt = registroFoto.motivoRechazo ? `: ${registroFoto.motivoRechazo}` : '';
         badge = `<span style="background:#ef5350;color:#fff;font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:20px" title="No corresponde${motivoTxt}">❌ Rechazada — subí la foto correcta</span>`;
@@ -6030,11 +6169,16 @@ function renderConocimientos(){
 }
 
 // ── Buscador de alumno para el FORMULARIO (agregar a la falta) ──
+// Quita tildes/acentos para que "jose" encuentre "José", "nuñez" encuentre "Núñez", etc.
+function normalizarTexto(str){
+  return (str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function buscarAlumnoConocimiento(texto){
   const cont = document.getElementById('conoc-sugerencias-alumno');
-  const t = texto.trim().toLowerCase();
+  const t = normalizarTexto(texto.trim());
   if(t===''){ cont.innerHTML=''; return; }
-  const encontrados = ALUMNOS.filter(a=>a.n.toLowerCase().includes(t) && !_conocFormAlumnos.includes(a.id)).slice(0,8);
+  const encontrados = ALUMNOS.filter(a=>normalizarTexto(a.n).includes(t) && !_conocFormAlumnos.includes(a.id)).slice(0,8);
   if(encontrados.length===0){
     cont.innerHTML = '<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;padding:8px 12px;font-size:.8rem;color:#888;width:100%;box-sizing:border-box">Sin coincidencias</div>';
     return;
@@ -6144,6 +6288,22 @@ function guardarConocimiento(){
   };
   setConocimientos(data);
   renderConocimientos();
+  mostrarConfirmacionConocimiento(numero);
+}
+
+// Confirmación visible + desplazamiento automático hasta el Libro de Conocimientos,
+// para que quede claro dónde aparece lo que se acaba de guardar.
+function mostrarConfirmacionConocimiento(numero){
+  const banner = document.createElement('div');
+  banner.textContent = `✅ Conocimiento No. ${numero} guardado — mirá el Libro de Conocimientos abajo`;
+  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2e7d32;color:#fff;padding:12px 22px;border-radius:30px;font-family:\'Baloo 2\',cursive;font-weight:700;font-size:.85rem;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:99999';
+  document.body.appendChild(banner);
+  setTimeout(()=>{ banner.style.transition='opacity .5s'; banner.style.opacity='0'; setTimeout(()=>banner.remove(), 500); }, 2600);
+
+  setTimeout(()=>{
+    const lista = document.getElementById('conoc-lista');
+    if(lista) lista.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 300);
 }
 
 function eliminarConocimiento(numero){
@@ -6158,7 +6318,7 @@ function eliminarConocimiento(numero){
 function renderListaConocimientos(){
   const cont = document.getElementById('conoc-lista');
   const data = getConocimientos();
-  let entradas = Object.values(data).sort((a,b)=>b.numero-a.numero); // más reciente primero
+  let entradas = Object.values(data).sort((a,b)=>(b.numero||0)-(a.numero||0)); // más reciente primero
 
   if(_conocFiltroAlumnoId){
     entradas = entradas.filter(c=>c.alumnoIds && c.alumnoIds.includes(_conocFiltroAlumnoId));
@@ -6170,45 +6330,114 @@ function renderListaConocimientos(){
   }
 
   cont.innerHTML = entradas.map(c=>{
-    const fechaTxt = new Date(c.fecha).toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-    const alumnosTxt = (c.alumnoIds && c.alumnoIds.length>0)
-      ? c.alumnoIds.map(id=>{ const a=ALUMNOS.find(x=>x.id===id); return a ? `${a.em} ${a.n}` : ''; }).filter(Boolean).join(', ')
-      : '(sin alumno específico)';
-    const info = c.gravedad ? SANCIONES_LEY_CONVIVENCIA[c.gravedad] : null;
-    const reincidenciasHtml = (c.alumnoIds||[]).map(id=>{
-      const cuenta = contarConocimientosPorAlumno(id);
-      if(cuenta > UMBRAL_ALERTA_CONOCIMIENTOS){
-        const a = ALUMNOS.find(x=>x.id===id);
-        return `<div style="background:#ffebee;border-left:4px solid #c62828;border-radius:6px;padding:6px 10px;font-size:.72rem;color:#b71c1c;font-weight:700;margin-top:6px">⚠️ ${a?a.n:''} acumula ${cuenta} conocimientos este ciclo — reincidencia.</div>`;
-      }
-      return '';
-    }).join('');
+    // Cada tarjeta se arma dentro de un try/catch: si un registro viejo o incompleto
+    // (por ejemplo, sin descripción) fallara, no rompe la lista completa — solo esa tarjeta.
+    try{
+      const descripcionSegura = c.descripcion || '(sin descripción registrada)';
+      const numeroSeguro = c.numero!==undefined ? c.numero : '—';
+      const fechaTxt = c.fecha ? new Date(c.fecha).toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '(fecha no disponible)';
+      const alumnosTxt = (c.alumnoIds && c.alumnoIds.length>0)
+        ? c.alumnoIds.map(id=>{ const a=ALUMNOS.find(x=>x.id===id); return a ? `${a.em} ${a.n}` : ''; }).filter(Boolean).join(', ')
+        : '(sin alumno específico)';
+      const info = (c.gravedad && SANCIONES_LEY_CONVIVENCIA[c.gravedad]) ? SANCIONES_LEY_CONVIVENCIA[c.gravedad] : null;
+      const reincidenciasHtml = (c.alumnoIds||[]).map(id=>{
+        const cuenta = contarConocimientosPorAlumno(id);
+        if(cuenta > UMBRAL_ALERTA_CONOCIMIENTOS){
+          const a = ALUMNOS.find(x=>x.id===id);
+          return `<div style="background:#ffebee;border-left:4px solid #c62828;border-radius:6px;padding:6px 10px;font-size:.72rem;color:#b71c1c;font-weight:700;margin-top:6px">⚠️ ${a?a.n:''} acumula ${cuenta} conocimientos este ciclo — reincidencia.</div>`;
+        }
+        return '';
+      }).join('');
 
-    return `<div style="background:#fdfaf6;border:1.5px solid #e6ddd0;border-radius:12px;padding:16px;font-family:'Baloo 2',cursive">
-      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-        <strong style="color:#4e342e">📕 Conocimiento No. ${c.numero}</strong>
-        <span style="color:#888;font-size:.8rem;text-transform:capitalize">${fechaTxt}</span>
-      </div>
-      <div style="border-top:1px dashed #d7cbb8;border-bottom:1px dashed #d7cbb8;padding:10px 0;margin-bottom:10px;font-size:.85rem;line-height:1.5">
-        <em>En la Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo" se deja constancia de lo siguiente:</em><br><br>
-        ${c.descripcion.replace(/\n/g,'<br>')}
-      </div>
-      <div style="font-size:.82rem;margin-bottom:4px"><strong>Alumno(s) involucrado(s):</strong> ${alumnosTxt}</div>
-      ${info ? `<div style="font-size:.82rem;margin-bottom:4px"><strong>Gravedad:</strong> ${info.titulo}</div>
-        <div style="background:#efebe9;border-radius:8px;padding:8px 12px;font-size:.76rem;margin-bottom:6px">${info.texto}</div>` : ''}
-      ${reincidenciasHtml}
-      <div style="font-size:.78rem;color:#888;margin-top:8px">Elaborado por: ${c.elaboradoPor}</div>
-      <button onclick="eliminarConocimiento(${c.numero})" class="btn bro" style="margin-top:10px;padding:6px 14px;font-size:.72rem">🗑️ Eliminar</button>
-    </div>`;
+      return `<div style="background:#fdfaf6;border:1.5px solid #e6ddd0;border-radius:12px;padding:16px;font-family:'Baloo 2',cursive">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <strong style="color:#4e342e">📕 Conocimiento No. ${numeroSeguro}</strong>
+          <span style="color:#888;font-size:.8rem;text-transform:capitalize">${fechaTxt}</span>
+        </div>
+        <div style="border-top:1px dashed #d7cbb8;border-bottom:1px dashed #d7cbb8;padding:10px 0;margin-bottom:10px;font-size:.85rem;line-height:1.5">
+          <em>En la Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo" se deja constancia de lo siguiente:</em><br><br>
+          ${descripcionSegura.replace(/\n/g,'<br>')}
+        </div>
+        <div style="font-size:.82rem;margin-bottom:4px"><strong>Alumno(s) involucrado(s):</strong> ${alumnosTxt}</div>
+        ${info ? `<div style="font-size:.82rem;margin-bottom:4px"><strong>Gravedad:</strong> ${info.titulo}</div>
+          <div style="background:#efebe9;border-radius:8px;padding:8px 12px;font-size:.76rem;margin-bottom:6px">${info.texto}</div>` : ''}
+        ${reincidenciasHtml}
+        <div style="font-size:.78rem;color:#888;margin-top:8px">Elaborado por: ${c.elaboradoPor || 'Prof. Marco Antonio Lima Ortiz'}</div>
+        <button onclick="eliminarConocimiento(${numeroSeguro})" class="btn bro" style="margin-top:10px;padding:6px 14px;font-size:.72rem">🗑️ Eliminar</button>
+      </div>`;
+    } catch(err){
+      console.error('Conocimiento con datos dañados, no se pudo mostrar completo:', c, err);
+      return `<div style="background:#fff3e0;border:1.5px dashed #ffb74d;border-radius:12px;padding:14px;font-family:'Baloo 2',cursive;font-size:.8rem;color:#e65100">
+        ⚠️ Un registro (No. ${c.numero!==undefined?c.numero:'?'}) tiene datos incompletos y no se pudo mostrar completo.
+        <button onclick="eliminarConocimiento(${c.numero})" class="btn bro" style="margin-top:8px;padding:6px 14px;font-size:.72rem;display:block">🗑️ Eliminar este registro dañado</button>
+      </div>`;
+    }
   }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// ACTAS SUSCRITAS — vaciado simple y directo, se conecta a Firebase fresco cada vez,
+// sin depender del caché local ni de ningún otro estado. Es una vista de solo lectura.
+// ═══════════════════════════════════════════════
+function renderActasSuscritas(){
+  const estadoCont = document.getElementById('actas-estado');
+  const lista = document.getElementById('actas-lista');
+  estadoCont.textContent = '🔄 Cargando desde la base de datos...';
+  lista.innerHTML = '';
+
+  db.ref('conocimientos_general').once('value').then(snap=>{
+    const data = snap.val() || {};
+    const entradas = Object.keys(data).map(k=>data[k]).sort((a,b)=>(b.numero||0)-(a.numero||0));
+
+    if(entradas.length===0){
+      estadoCont.textContent = '';
+      lista.innerHTML = '<p style="font-size:.85rem;color:#888;text-align:center;padding:20px">Todavía no hay conocimientos guardados en la base de datos.</p>';
+      return;
+    }
+    estadoCont.textContent = `✅ ${entradas.length} conocimiento(s) encontrado(s).`;
+
+    lista.innerHTML = entradas.map(c=>{
+      try{
+        const descripcionSegura = c.descripcion || '(sin descripción registrada)';
+        const numeroSeguro = c.numero!==undefined ? c.numero : '—';
+        const fechaTxt = c.fecha ? new Date(c.fecha).toLocaleDateString('es-GT',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '(fecha no disponible)';
+        const alumnosTxt = (c.alumnoIds && c.alumnoIds.length>0)
+          ? c.alumnoIds.map(id=>{ const a=ALUMNOS.find(x=>x.id===id); return a ? `${a.em} ${a.n}` : `(alumno id ${id})`; }).join(', ')
+          : '(sin alumno específico)';
+        const info = (c.gravedad && SANCIONES_LEY_CONVIVENCIA[c.gravedad]) ? SANCIONES_LEY_CONVIVENCIA[c.gravedad] : null;
+
+        return `<div style="background:#fdfaf6;border:1.5px solid #e6ddd0;border-radius:12px;padding:16px;font-family:'Baloo 2',cursive">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <strong style="color:#3e2723">📜 Conocimiento No. ${numeroSeguro}</strong>
+            <span style="color:#888;font-size:.8rem;text-transform:capitalize">${fechaTxt}</span>
+          </div>
+          <div style="border-top:1px dashed #d7cbb8;border-bottom:1px dashed #d7cbb8;padding:10px 0;margin-bottom:10px;font-size:.85rem;line-height:1.5">
+            <em>En la Escuela Oficial Urbana de Varones No. 1 "Abraham A. Cerezo" se deja constancia de lo siguiente:</em><br><br>
+            ${descripcionSegura.replace(/\n/g,'<br>')}
+          </div>
+          <div style="font-size:.82rem;margin-bottom:4px"><strong>Alumno(s) involucrado(s):</strong> ${alumnosTxt}</div>
+          ${info ? `<div style="font-size:.82rem;margin-bottom:4px"><strong>Gravedad:</strong> ${info.titulo}</div>` : ''}
+          <div style="font-size:.78rem;color:#888;margin-top:8px">Elaborado por: ${c.elaboradoPor || 'Prof. Marco Antonio Lima Ortiz'}</div>
+        </div>`;
+      } catch(err){
+        console.error('Registro dañado en Actas Suscritas:', c, err);
+        return `<div style="background:#fff3e0;border:1.5px dashed #ffb74d;border-radius:12px;padding:14px;font-family:'Baloo 2',cursive;font-size:.8rem;color:#e65100">
+          ⚠️ Un registro tiene datos incompletos y no se pudo mostrar completo.
+        </div>`;
+      }
+    }).join('');
+  }).catch(e=>{
+    estadoCont.textContent = '❌ No se pudo conectar a la base de datos. Revisa tu conexión a internet.';
+    console.error('Error cargando Actas Suscritas:', e);
+  });
 }
 
 // ── Buscador para VER el historial de un alumno en particular ──
 function filtrarConocimientosPorAlumno(texto){
   const cont = document.getElementById('conoc-filtro-sugerencias');
-  const t = texto.trim().toLowerCase();
+  const t = normalizarTexto(texto.trim());
   if(t===''){ cont.innerHTML=''; return; }
-  const encontrados = ALUMNOS.filter(a=>a.n.toLowerCase().includes(t)).slice(0,8);
+  const encontrados = ALUMNOS.filter(a=>normalizarTexto(a.n).includes(t)).slice(0,8);
   if(encontrados.length===0){
     cont.innerHTML = '<div style="position:absolute;z-index:5;background:#fff;border:1.5px solid #dde3ea;border-radius:10px;padding:8px 12px;font-size:.8rem;color:#888;width:100%;box-sizing:border-box">Sin coincidencias</div>';
     return;
