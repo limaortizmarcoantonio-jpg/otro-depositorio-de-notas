@@ -5718,12 +5718,12 @@ function renderCondGrid(){
   // Abreviaciones de aspectos para encabezados
   const ABREV = ['Puntualidad','Responsabilidad','Limpieza','Respeto','Participación','Trabajo Equipo','Vocabulario','Orden/Disciplina'];
 
-  let html = `<div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+  let html = `<div style="overflow:auto;max-height:70vh;border-radius:8px">
+  <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:.78rem">
     <thead>
       <tr style="background:linear-gradient(90deg,#e65100,#ff6f00);color:#fff">
-        <th style="padding:8px 10px;text-align:left;min-width:180px;border-radius:8px 0 0 0">#&nbsp;&nbsp;Alumno</th>
-        ${ABREV.map(a=>`<th style="padding:6px 4px;text-align:center;min-width:90px;font-size:.7rem">${a}</th>`).join('')}
+        <th style="padding:8px 10px;text-align:left;min-width:180px;border-radius:8px 0 0 0;position:sticky;top:0;left:0;z-index:3;background:#e65100">#&nbsp;&nbsp;Alumno</th>
+        ${ABREV.map(a=>`<th style="padding:6px 4px;text-align:center;min-width:90px;font-size:.7rem;position:sticky;top:0;z-index:2;background:#ef6c00">${a}</th>`).join('')}
       </tr>
     </thead>
     <tbody>`;
@@ -5735,10 +5735,10 @@ function renderCondGrid(){
     const bg = (idx%2===0)?'#fafafa':'#fff';
     const leftBorder = completo ? '4px solid #81c784' : '4px solid #ffcc80';
 
-    html+=`<tr style="background:${bg};border-left:${leftBorder}">
-      <td style="padding:7px 10px;font-weight:700;color:#1a2332;white-space:nowrap">
+    html+=`<tr style="background:${bg}">
+      <td style="padding:7px 10px;font-weight:700;color:#1a2332;white-space:nowrap;position:sticky;left:0;z-index:1;background:${bg};border-left:${leftBorder}">
         <span style="font-size:1rem">${al.em}</span> ${al.n}
-        ${completo?'<span style="color:#1b5e20;font-size:.65rem;margin-left:4px">✅</span>':''}
+        ${completo?'<span class="cond-completo-check" style="color:#1b5e20;font-size:.65rem;margin-left:4px">✅</span>':''}
       </td>
       ${ASPECTOS.map(asp=>{
         const v=vals[asp]||'';
@@ -5776,11 +5776,23 @@ function selCondGridTable(sel, alId, unidad, aspecto){
   if(valor) c[key][aspecto]=valor;
   else delete c[key][aspecto];
   setConductas(c);
-  // Actualizar indicador de la fila
+  // Actualizar indicador de la fila (el borde ahora vive en la primera celda, que es la fija)
   const fila = sel.closest('tr');
   if(fila){
+    const primeraCelda = fila.querySelector('td');
     const completo = ASPECTOS.every(a=>getConductas()[`${alId}_${unidad}`]?.[a]);
-    fila.style.borderLeft = completo ? '4px solid #81c784' : '4px solid #ffcc80';
+    if(primeraCelda) primeraCelda.style.borderLeft = completo ? '4px solid #81c784' : '4px solid #ffcc80';
+    // Mostrar/ocultar la palomita de "completo" junto al nombre
+    let palomita = primeraCelda ? primeraCelda.querySelector('.cond-completo-check') : null;
+    if(completo && primeraCelda && !palomita){
+      palomita = document.createElement('span');
+      palomita.className = 'cond-completo-check';
+      palomita.style.cssText = 'color:#1b5e20;font-size:.65rem;margin-left:4px';
+      palomita.textContent = '✅';
+      primeraCelda.appendChild(palomita);
+    } else if(!completo && palomita){
+      palomita.remove();
+    }
   }
 }
 
