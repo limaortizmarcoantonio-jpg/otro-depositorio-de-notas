@@ -1358,6 +1358,9 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
       <button class="btn bro" onclick="recalcularBoletaDesdeRegistro()" style="font-size:.75rem;padding:6px 14px;margin-left:8px" title="Recalcula todos los punteos de la boleta leyendo directamente del registro de actividades">
         🔄 Recalcular Boleta
       </button>
+      <button class="btn bro" onclick="limpiarUnidadBoleta()" style="font-size:.75rem;padding:6px 14px;margin-left:8px;background:#c62828" title="Borra las notas y los valores de conducta de la Unidad correspondiente a este bimestre en la boleta, dejándola en blanco">
+        🧹 Limpiar esta Unidad en la Boleta
+      </button>
     </div>
     <div id="al-rank"></div>
   </div>
@@ -2528,14 +2531,15 @@ function setReportes(d){
 }
 function initReportesFirebase(){
   if(!bimestreActivo) return;
-  db.ref(`reportes_${bimestreActivo}`).on('value',snap=>{
+  const miBim = bimestreActivo;
+  db.ref(`reportes_${miBim}`).on('value',snap=>{
     const data = snap.val();
     if(data && Object.keys(data).length > 0){
-      localStorage.setItem(`reportes_${bimestreActivo}`, JSON.stringify(data));
+      localStorage.setItem(`reportes_${miBim}`, JSON.stringify(data));
     } else {
-      localStorage.setItem(`reportes_${bimestreActivo}`, JSON.stringify({}));
+      localStorage.setItem(`reportes_${miBim}`, JSON.stringify({}));
     }
-    renderAvatarGrid();
+    if(miBim === bimestreActivo) renderAvatarGrid();
   });
 }
 
@@ -2820,6 +2824,8 @@ const ALUMNOS = [
 // BASE DE DATOS – FIREBASE REALTIME
 // ═══════════════════════════════════════════════
 let _cuadernos = {};
+let _cuadernosListenerRef = null;
+let _cuadernosListenerCB = null;
 let _fbListo = false;
 
 function getCuadernos(){ return _cuadernos; }
@@ -2837,33 +2843,41 @@ function setCuadernos(d){
 
 function initCuadernos(){
   if(!bimestreActivo) return;
-  // Escuchar cambios en tiempo real desde Firebase para el bimestre activo
-  db.ref(`cuadernos_${bimestreActivo}`).on('value', snap=>{
+  const miBim = bimestreActivo; // el bimestre real de ESTE listener, fijo para siempre (nunca cambia aunque el usuario navegue a otro)
+
+  // Quitar el listener anterior (de otro bimestre) para no acumular listeners activos al cambiar de bimestre
+  if(_cuadernosListenerRef && _cuadernosListenerCB){
+    _cuadernosListenerRef.off('value', _cuadernosListenerCB);
+  }
+
+  const ref = db.ref(`cuadernos_${miBim}`);
+  const callback = snap=>{
     const data = snap.val();
-    if(data){
-      _cuadernos = data;
-    } else {
-      _cuadernos = {};
-    }
+    const cuad = data ? data : {};
     let changed = false;
     MATERIAS.forEach(m=>{
-      if(!_cuadernos[m]){ _cuadernos[m]={actividades:[],notas:{}}; changed=true; }
-      if(!_cuadernos[m].notas){ _cuadernos[m].notas={}; changed=true; }
-      if(!_cuadernos[m].actividades){ _cuadernos[m].actividades=[]; changed=true; }
+      if(!cuad[m]){ cuad[m]={actividades:[],notas:{}}; changed=true; }
+      if(!cuad[m].notas){ cuad[m].notas={}; changed=true; }
+      if(!cuad[m].actividades){ cuad[m].actividades=[]; changed=true; }
     });
-    if(changed) db.ref(`cuadernos_${bimestreActivo}`).set(_cuadernos);
-    // Sincronizar siempre con localStorage para que recalcularBoleta lea datos frescos
-    localStorage.setItem(`cuadernos_${bimestreActivo}`, JSON.stringify(_cuadernos));
+    if(changed) ref.set(cuad);
+    // Este cache SIEMPRE corresponde a "miBim" — el bimestre real de este listener —
+    // nunca al bimestre "activo en este momento", que pudo haber cambiado mientras tanto.
+    localStorage.setItem(`cuadernos_${miBim}`, JSON.stringify(cuad));
 
-    if(!_fbListo){
+    // Solo actualizar lo que se ve en pantalla si el usuario sigue en ESTE MISMO bimestre;
+    // si ya navegó a otro, esta actualización llegó tarde y no debe pisar lo que se ve ahora.
+    if(miBim === bimestreActivo){
+      _cuadernos = cuad;
       _fbListo = true;
       renderRanking();
       if(matActual) renderCuaderno(matActual);
-    } else {
-      renderRanking();
-      if(matActual) renderCuaderno(matActual);
     }
-  });
+  };
+
+  _cuadernosListenerRef = ref;
+  _cuadernosListenerCB = callback;
+  ref.on('value', callback);
 }
 
 // ═══════════════════════════════════════════════
@@ -5195,7 +5209,7 @@ async function exportarABoleta(silencioso=false){
 
   const boletaRaw = localStorage.getItem('boleta_v26');
   let studentsLocal = boletaRaw ? JSON.parse(boletaRaw) : [];
-  while(studentsLocal.length < 31){
+  while(studentsLocal.length < ALUMNOS.length){
     studentsLocal.push({ nombre:'', notas: Array.from({length:4},()=>Array(8).fill('')), valores: Array.from({length:4},()=>Array(8).fill('')) });
   }
 
@@ -5233,6 +5247,36 @@ async function exportarABoleta(silencioso=false){
   if(!silencioso && actualizados>0){
     mostrarAl('rank', `✅ ${actualizados} nota(s) exportadas a la boleta en Unidad ${unidad+1}.`, 'ok');
   }
+}
+
+// Borra en la Boleta (notas y valores de conducta) SOLO la Unidad correspondiente al
+// bimestre activo, dejándola en blanco tal como estaba — sin tocar las otras unidades.
+// Útil para limpiar datos que quedaron mal por error (por ejemplo, de otro bimestre).
+function limpiarUnidadBoleta(){
+  const bimId = bimestreActivo;
+  const unidad = MAPA_UNIDAD[bimId];
+  if(unidad === undefined){ alert('Selecciona primero un bimestre.'); return; }
+  const bim = BIMESTRES.find(b=>b.id===bimId);
+  const nombreUnidad = `Unidad ${unidad+1}`;
+  if(!confirm(`¿Seguro que quieres borrar TODAS las notas y valores de conducta de ${nombreUnidad} en la Boleta (correspondiente a ${bim?bim.nombre:bimId})? Esta acción no se puede deshacer, y no afecta a las demás unidades.`)) return;
+
+  const boletaRaw = localStorage.getItem('boleta_v26');
+  let studentsLocal = boletaRaw ? JSON.parse(boletaRaw) : [];
+  while(studentsLocal.length < ALUMNOS.length){
+    studentsLocal.push({ nombre:'', notas: Array.from({length:4},()=>Array(8).fill('')), valores: Array.from({length:4},()=>Array(8).fill('')) });
+  }
+
+  studentsLocal.forEach(s=>{
+    if(!s.notas) s.notas = Array.from({length:4},()=>Array(8).fill(''));
+    if(!s.valores) s.valores = Array.from({length:4},()=>Array(8).fill(''));
+    s.notas[unidad] = Array(8).fill('');
+    s.valores[unidad] = Array(8).fill('');
+  });
+
+  localStorage.setItem('boleta_v26', JSON.stringify(studentsLocal));
+  if(typeof students !== 'undefined') students.splice(0, students.length, ...studentsLocal);
+
+  mostrarAl('rank', `🧹 ${nombreUnidad} de la Boleta quedó en blanco.`, 'ok');
 }
 
 function abrirBoleta_OLD_UNUSED(){
@@ -5543,9 +5587,10 @@ function setPuntos(d){
 }
 function initPuntosFirebase(){
   if(!bimestreActivo) return;
-  db.ref(`puntos_${bimestreActivo}`).on('value', snap=>{
-    if(snap.val()) localStorage.setItem(`puntos_${bimestreActivo}`, JSON.stringify(snap.val()));
-    renderAvatarGrid();
+  const miBim = bimestreActivo;
+  db.ref(`puntos_${miBim}`).on('value', snap=>{
+    if(snap.val()) localStorage.setItem(`puntos_${miBim}`, JSON.stringify(snap.val()));
+    if(miBim === bimestreActivo) renderAvatarGrid();
   });
 }
 
@@ -6604,12 +6649,13 @@ function setConductas(d){
 
 function initConductaFirebase(){
   if(!bimestreActivo) return;
-  db.ref(`conductas_${bimestreActivo}`).on('value', snap=>{
+  const miBim = bimestreActivo;
+  db.ref(`conductas_${miBim}`).on('value', snap=>{
     const data = snap.val();
     if(data && Object.keys(data).length > 0){
-      localStorage.setItem(`conductas_${bimestreActivo}`, JSON.stringify(data));
+      localStorage.setItem(`conductas_${miBim}`, JSON.stringify(data));
     } else if(data !== null && Object.keys(data||{}).length === 0){
-      localStorage.setItem(`conductas_${bimestreActivo}`, JSON.stringify({}));
+      localStorage.setItem(`conductas_${miBim}`, JSON.stringify({}));
     }
   });
 }
