@@ -1549,12 +1549,13 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 
     <!-- Paso 4: subir foto -->
     <div id="subir-paso4" style="display:none;margin-top:18px">
-      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">4️⃣ Subí hasta 3 fotos de la tarea</h3>
-      <p style="font-size:.78rem;color:#888;margin-bottom:8px">Podés subir hasta 3 fotos (por ejemplo, si la tarea tiene varias páginas).</p>
+      <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">4️⃣ Subí hasta 10 fotos de la tarea</h3>
+      <p style="font-size:.78rem;color:#888;margin-bottom:8px">Podés subir hasta 10 fotos (por ejemplo, si la tarea tiene varias páginas).</p>
       <input type="file" id="subir-input-foto" accept="image/*" capture="environment" multiple onchange="previsualizarFotoTarea(event)"
         style="display:block;margin-bottom:10px;font-family:'Baloo 2',cursive">
       <div id="subir-preview" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
       <button class="btn bv" id="subir-btn-enviar" onclick="enviarFotoTarea()" style="padding:11px 18px;display:none">📤 Enviar Tarea</button>
+      <div id="subir-estado-envio" style="display:none;margin-top:10px;background:#fff8e1;border-left:4px solid #ffa726;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#7a5200"></div>
     </div>
 
     <div id="subir-confirmacion" style="display:none;margin-top:18px;background:#e8f5e9;border-radius:12px;padding:16px;text-align:center">
@@ -2677,13 +2678,32 @@ function sugerirGravedadPorTexto(texto){
 // Fotos de tareas subidas por los padres — {materia: {actIndex: {alumnoId: {foto, fecha}}}}
 let _tareasFotos = {};
 function getTareasFotos(){ return _tareasFotos; }
+let _tareasFotosListenerRef = null;
+let _tareasFotosListenerCB = null;
 function initTareasFotosFirebase(){
   if(!bimestreActivo) return;
-  db.ref(`tareasfotos_${bimestreActivo}`).on('value',snap=>{
-    _tareasFotos = snap.val() || {};
-    localStorage.setItem(`tareasfotos_${bimestreActivo}`, JSON.stringify(_tareasFotos));
-    if(matActual) renderCuaderno(matActual);
-  });
+  const miBim = bimestreActivo; // el bimestre real de ESTE listener, fijo para siempre
+
+  // Quitar el listener anterior (de otro bimestre) para no acumular listeners activos
+  if(_tareasFotosListenerRef && _tareasFotosListenerCB){
+    _tareasFotosListenerRef.off('value', _tareasFotosListenerCB);
+  }
+
+  const ref = db.ref(`tareasfotos_${miBim}`);
+  const callback = snap=>{
+    const data = snap.val() || {};
+    localStorage.setItem(`tareasfotos_${miBim}`, JSON.stringify(data));
+    // Solo actualizar lo que se ve en pantalla si el usuario sigue en ESTE MISMO bimestre;
+    // si ya navegó a otro, esta actualización llegó tarde y no debe pisar lo que se ve ahora.
+    if(miBim === bimestreActivo){
+      _tareasFotos = data;
+      if(matActual) renderCuaderno(matActual);
+    }
+  };
+
+  _tareasFotosListenerRef = ref;
+  _tareasFotosListenerCB = callback;
+  ref.on('value', callback);
 }
 
 function seleccionarBimestre(bimId){
@@ -4600,7 +4620,7 @@ function rechazarFotoTarea(mat, actIndex, alId){
 // ═══════════════════════════════════════════════
 // BUZÓN DE TAREAS — flujo público para que los padres suban la foto
 // ═══════════════════════════════════════════════
-const MAX_FOTOS_TAREA = 3;
+const MAX_FOTOS_TAREA = 10;
 let _subirTarea = { alumnoId:null, materia:null, actIndex:null, fotos:[] };
 
 function initSubirTarea(){
@@ -4629,7 +4649,10 @@ function reiniciarSubirTarea(){
   document.querySelectorAll('#subir-av-grid .av-card').forEach(c=>c.classList.remove('sel'));
   const preview = document.getElementById('subir-preview'); if(preview) preview.innerHTML='';
   const btnEnv = document.getElementById('subir-btn-enviar'); if(btnEnv) btnEnv.style.display='none';
-  const inpFoto = document.getElementById('subir-input-foto'); if(inpFoto) inpFoto.value='';
+  const inpFoto = document.getElementById('subir-input-foto'); if(inpFoto){ inpFoto.value=''; inpFoto.style.display='block'; }
+  const estEnv = document.getElementById('subir-estado-envio'); if(estEnv){ estEnv.style.display='none'; estEnv.innerHTML=''; }
+  _enviandoTarea = false;
+  if(btnEnv){ btnEnv.disabled=false; btnEnv.textContent='📤 Enviar Tarea'; }
 }
 
 function seleccionarAlumnoSubirTarea(alId, card){
@@ -4779,25 +4802,74 @@ function quitarFotoTarea(indice){
   renderPreviewFotosTarea();
 }
 
+let _enviandoTarea = false;
 function enviarFotoTarea(){
+  if(_enviandoTarea) return; // evita enviar dos veces si tocan el botón repetido
   const { alumnoId, materia, actIndex, fotos } = _subirTarea;
-  if(!alumnoId || !materia || actIndex===null || !fotos || fotos.length===0){
+  if(alumnoId===null || !materia || actIndex===null || !fotos || fotos.length===0){
     alert('Falta completar un paso: alumno, materia, actividad o al menos una foto.');
     return;
   }
-  const path = `tareasfotos_${bimestreActivo}/${materia}/${actIndex}/${alumnoId}`;
-  db.ref(path).set({ fotos: fotos, fecha: Date.now() })
-    .then(()=>{
-      document.getElementById('subir-paso1').style.display = 'none';
-      document.getElementById('subir-paso2').style.display = 'none';
-      document.getElementById('subir-paso3').style.display = 'none';
-      document.getElementById('subir-paso4').style.display = 'none';
-      document.getElementById('subir-confirmacion').style.display = 'block';
-    })
-    .catch(e=>{
-      alert('No se pudo enviar la tarea. Revisa tu conexión a internet e intenta de nuevo.');
-      console.error(e);
+  if(!bimestreActivo){
+    alert('Primero elegí el bimestre desde la pantalla de inicio y volvé a entrar a "Subir Tarea".');
+    return;
+  }
+  const pesoKB = Math.round(fotos.reduce((s,f)=>s+f.length,0)/1024);
+  if(pesoKB > 12000){
+    alert(`Las fotos pesan demasiado (${Math.round(pesoKB/1024)} MB). Quitá algunas e intentá de nuevo.`);
+    return;
+  }
+
+  const btn = document.getElementById('subir-btn-enviar');
+  const estado = document.getElementById('subir-estado-envio');
+  const restaurar = ()=>{ _enviandoTarea=false; btn.disabled=false; btn.textContent='📤 Enviar Tarea'; };
+
+  _enviandoTarea = true;
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  estado.style.display = 'block';
+  estado.innerHTML = `⏳ Enviando ${fotos.length} foto(s) (~${pesoKB} KB)… no cierres esta pantalla hasta ver el ✅.`;
+
+  // Avisar si el dispositivo no tiene conexión con la base de datos
+  try{
+    db.ref('.info/connected').once('value').then(s=>{
+      if(_enviandoTarea && s.val()===false){
+        estado.innerHTML = '📵 Sin conexión con la base de datos. Revisá tu internet; si vuelve la conexión, el envío continuará solo (no cierres esta pantalla).';
+      }
     });
+  }catch(e){}
+
+  let terminado = false;
+  const timer = setTimeout(()=>{
+    if(!terminado){
+      estado.innerHTML = '⏳ Está tardando más de lo normal (internet lento). Esperá un poco más. Si pasa de 1 minuto, quitá algunas fotos e intentá de nuevo.';
+    }
+  }, 20000);
+
+  const path = `tareasfotos_${bimestreActivo}/${materia}/${actIndex}/${alumnoId}`;
+  let promesa;
+  try{
+    promesa = db.ref(path).set({ fotos: fotos, fecha: Date.now() });
+  }catch(e){
+    terminado = true; clearTimeout(timer); restaurar();
+    estado.style.display='none';
+    alert('No se pudo enviar la tarea.\n\nDetalle técnico: ' + (e && e.message ? e.message : e));
+    console.error(e);
+    return;
+  }
+
+  promesa.then(()=>{
+    terminado = true; clearTimeout(timer);
+    _enviandoTarea = false;
+    estado.style.display = 'none';
+    ['subir-paso1','subir-paso2','subir-paso3','subir-paso4'].forEach(id=>{ document.getElementById(id).style.display='none'; });
+    document.getElementById('subir-confirmacion').style.display = 'block';
+  }).catch(e=>{
+    terminado = true; clearTimeout(timer); restaurar();
+    estado.style.display = 'none';
+    alert('No se pudo enviar la tarea.\n\nDetalle técnico: ' + (e && e.message ? e.message : e) + '\n\nSi el mensaje dice "permission" o "PERMISSION_DENIED", avisale al maestro.');
+    console.error(e);
+  });
 }
 
 // ═══════════════════════════════════════════════
