@@ -1550,6 +1550,7 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
     <!-- Paso 4: subir foto -->
     <div id="subir-paso4" style="display:none;margin-top:18px">
       <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">4️⃣ Subí hasta 10 fotos de la tarea</h3>
+      <div id="subir-aviso-reemplazo" style="display:none;background:#e3f2fd;border-left:4px solid #1976d2;border-radius:8px;padding:9px 12px;font-size:.8rem;color:#0d47a1;margin-bottom:8px"></div>
       <p style="font-size:.78rem;color:#888;margin-bottom:8px">Podés subir hasta 10 fotos (por ejemplo, si la tarea tiene varias páginas).</p>
       <input type="file" id="subir-input-foto" accept="image/*" capture="environment" multiple onchange="previsualizarFotoTarea(event)"
         style="display:block;margin-bottom:10px;font-family:'Baloo 2',cursive">
@@ -4498,9 +4499,12 @@ function verFotoTarea(mat, actIndex, alId){
   overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
 
   const imgs = fotos.map((f,i)=>`
-    <div class="foto-zoom-wrap" data-idx="${i}" style="overflow:hidden;max-width:92vw;max-height:65vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:10px;position:relative;background:#111;display:flex;align-items:center;justify-content:center;cursor:zoom-in">
+    <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:10px">
+    <div class="foto-zoom-wrap" data-idx="${i}" style="overflow:hidden;max-width:92vw;max-height:65vh;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:6px;position:relative;background:#111;display:flex;align-items:center;justify-content:center;cursor:zoom-in">
       <span class="foto-zoom-nivel" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-size:.7rem;padding:3px 8px;border-radius:12px;font-family:'Baloo 2',cursive;z-index:2;pointer-events:none">100%</span>
       <img src="${f}" style="max-width:100%;max-height:65vh;display:block;transition:transform .12s ease;transform-origin:center center;user-select:none;-webkit-user-drag:none" alt="Foto ${i+1} de ${fotos.length}" draggable="false">
+    </div>
+    ${fotos.length>1 ? `<button type="button" onclick="event.stopPropagation();eliminarUnaFotoTarea('${mat.replace(/'/g,"\\'")}',${actIndex},${alId},${i})" style="padding:5px 14px;border-radius:16px;border:none;background:rgba(239,83,80,.9);color:#fff;font-weight:700;font-size:.72rem;cursor:pointer;font-family:'Baloo 2',cursive">🗑️ Quitar esta foto (${i+1})</button>` : ''}
     </div>`).join('');
   const avisoRechazada = registro.rechazada
     ? `<div style="background:#fff3e0;color:#e65100;border-radius:8px;padding:8px 12px;font-size:.78rem;margin-bottom:10px;max-width:400px;text-align:center">
@@ -4523,6 +4527,8 @@ function verFotoTarea(mat, actIndex, alId){
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
       <button onclick="event.stopPropagation();rechazarFotoTarea('${mat.replace(/'/g,"\\'")}',${actIndex},${alId})"
         style="padding:9px 18px;border-radius:20px;border:none;background:#ef5350;color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">❌ No corresponde — Rechazar</button>
+      <button onclick="event.stopPropagation();eliminarFotoTareaCompleta('${mat.replace(/'/g,"\\'")}',${actIndex},${alId})"
+        style="padding:9px 18px;border-radius:20px;border:none;background:#8d1c1c;color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">🗑️ Eliminar toda la entrega</button>
       <button onclick="event.stopPropagation();document.body.removeChild(document.getElementById('lightbox-foto-tarea'))"
         style="padding:9px 20px;border-radius:20px;border:none;background:#fff;color:#333;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Cerrar</button>
     </div>
@@ -4602,6 +4608,39 @@ function activarZoomFotosTarea(overlay){
   overlay.querySelector('.btn-zoom-reset').onclick = (e)=>{ e.stopPropagation(); (wrapActivo||wraps[0])._zoomReset(); };
 }
 
+function eliminarFotoTareaCompleta(mat, actIndex, alId){
+  const al = ALUMNOS.find(a=>a.id===alId);
+  if(!confirm(`¿Eliminar TODA la entrega de ${al?al.n:'este alumno'} en "${mat}"?\n\nSe borran las fotos enviadas y el alumno podrá volver a subirlas. Si ya tiene nota puesta, la nota NO se borra.`)) return;
+  db.ref(`tareasfotos_${bimestreActivo}/${mat}/${actIndex}/${alId}`).remove()
+    .then(()=>{
+      const ov = document.getElementById('lightbox-foto-tarea');
+      if(ov) document.body.removeChild(ov);
+    })
+    .catch(e=>{
+      alert('No se pudo eliminar. Revisa tu conexión e intenta de nuevo.\n\nDetalle: ' + (e && e.message ? e.message : e));
+      console.error(e);
+    });
+}
+
+function eliminarUnaFotoTarea(mat, actIndex, alId, idx){
+  const registro = getTareasFotos()?.[mat]?.[actIndex]?.[alId];
+  if(!registro) return;
+  const fotos = registro.fotos || (registro.foto ? [registro.foto] : []);
+  if(fotos.length<=1){ eliminarFotoTareaCompleta(mat, actIndex, alId); return; }
+  if(!confirm(`¿Quitar la foto ${idx+1} de ${fotos.length}? Las demás se conservan.`)) return;
+  const nuevas = fotos.filter((_,i)=>i!==idx);
+  db.ref(`tareasfotos_${bimestreActivo}/${mat}/${actIndex}/${alId}`).update({ fotos: nuevas, foto: null })
+    .then(()=>{
+      const ov = document.getElementById('lightbox-foto-tarea');
+      if(ov) document.body.removeChild(ov);
+      verFotoTarea(mat, actIndex, alId); // reabrir con las fotos restantes
+    })
+    .catch(e=>{
+      alert('No se pudo quitar la foto. Revisa tu conexión e intenta de nuevo.\n\nDetalle: ' + (e && e.message ? e.message : e));
+      console.error(e);
+    });
+}
+
 function rechazarFotoTarea(mat, actIndex, alId){
   const motivo = prompt('¿Por qué no corresponde esta foto? (opcional, se le mostrará al alumno/padre)', '');
   if(motivo===null) return; // canceló
@@ -4651,6 +4690,7 @@ function reiniciarSubirTarea(){
   const btnEnv = document.getElementById('subir-btn-enviar'); if(btnEnv) btnEnv.style.display='none';
   const inpFoto = document.getElementById('subir-input-foto'); if(inpFoto){ inpFoto.value=''; inpFoto.style.display='block'; }
   const estEnv = document.getElementById('subir-estado-envio'); if(estEnv){ estEnv.style.display='none'; estEnv.innerHTML=''; }
+  const avisoRe = document.getElementById('subir-aviso-reemplazo'); if(avisoRe){ avisoRe.style.display='none'; avisoRe.innerHTML=''; }
   _enviandoTarea = false;
   if(btnEnv){ btnEnv.disabled=false; btnEnv.textContent='📤 Enviar Tarea'; }
 }
@@ -4734,6 +4774,13 @@ function seleccionarMateriaSubirTarea(mat, btn){
 
 function seleccionarActividadSubirTarea(indice, btn){
   _subirTarea.actIndex = indice;
+  const regPrev = getTareasFotos()?.[_subirTarea.materia]?.[indice]?.[_subirTarea.alumnoId];
+  const yaHabia = regPrev && ((regPrev.fotos && regPrev.fotos.length>0) || regPrev.foto);
+  const avisoRe = document.getElementById('subir-aviso-reemplazo');
+  if(avisoRe){
+    if(yaHabia){ avisoRe.style.display='block'; avisoRe.innerHTML='ℹ️ Ya enviaste esta tarea. Si te equivocaste, subí las fotos correctas y presioná "Enviar Tarea": <b>reemplazan a las anteriores</b>.'; }
+    else { avisoRe.style.display='none'; }
+  }
   document.querySelectorAll('#subir-act-sel button').forEach(b=>{ b.classList.remove('bv'); b.classList.add('bgr'); });
   if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
   document.getElementById('subir-paso4').style.display = 'block';
