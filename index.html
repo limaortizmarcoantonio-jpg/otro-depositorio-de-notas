@@ -1545,12 +1545,15 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
         <span>✓ Calificada</span>
       </div>
       <div id="subir-act-sel" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button type="button" onclick="verificarEnFirebaseDirecto()" class="btn bgr" style="margin-top:12px;padding:7px 14px;font-size:.72rem">🔍 Verificar directo en la base de datos</button>
+      <div id="subir-diagnostico" style="display:none;margin-top:8px;background:#eceff1;border-radius:8px;padding:10px 12px;font-size:.72rem;font-family:monospace;white-space:pre-wrap;color:#333"></div>
     </div>
 
     <!-- Paso 4: subir foto -->
     <div id="subir-paso4" style="display:none;margin-top:18px">
       <h3 style="font-size:.95rem;color:#c2185b;margin-bottom:8px">4️⃣ Subí hasta 10 fotos de la tarea</h3>
       <div id="subir-aviso-reemplazo" style="display:none;background:#e3f2fd;border-left:4px solid #1976d2;border-radius:8px;padding:9px 12px;font-size:.8rem;color:#0d47a1;margin-bottom:8px"></div>
+      <div id="subir-entrega-actual" style="display:none;margin-bottom:12px"></div>
       <p style="font-size:.78rem;color:#888;margin-bottom:8px">Podés subir hasta 10 fotos (por ejemplo, si la tarea tiene varias páginas).</p>
       <input type="file" id="subir-input-foto" accept="image/*" capture="environment" multiple onchange="previsualizarFotoTarea(event)"
         style="display:block;margin-bottom:10px;font-family:'Baloo 2',cursive">
@@ -1861,6 +1864,22 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 
 <!-- ══════ CONFIGURACIÓN ══════ -->
 <div id="sec-config" class="sec" style="display:none">
+
+  <!-- Códigos de acceso por alumno -->
+  <div class="card" style="border:2px solid #ce93d8">
+    <h2 style="color:#6a1b9a">🔑 Códigos de Acceso para Padres</h2>
+    <div style="background:#fff8e1;border-left:4px solid #ffa726;border-radius:8px;padding:9px 12px;font-size:.8rem;color:#7a5200;margin-bottom:10px">⏸️ <strong>Candado desactivado por ahora:</strong> los padres entran a los avatares sin pedir código. Los códigos quedan guardados para activarlos más adelante.</div>
+    <p style="font-size:.83rem;color:#555;margin-bottom:12px">
+      Cada alumno tiene un código secreto de 4 dígitos. Sin ese código, nadie puede entrar a ver la información de ese niño en "Vista Padres" ni en "Subir Tarea" — así se evita que un padre vea los datos de otro niño aunque adivine el avatar.
+      Compartí el código de cada niño <strong>solo con su propia familia</strong> (por ejemplo, en privado por WhatsApp), no en el grupo general.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn bv" onclick="generarPinesFaltantes()" style="padding:10px 16px">🎲 Generar códigos para los que falten</button>
+      <button class="btn bro" onclick="regenerarTodosLosPines()" style="padding:10px 16px">🔄 Regenerar TODOS los códigos</button>
+    </div>
+    <div id="al-config-pines" style="margin-bottom:10px"></div>
+    <div id="lista-pines-alumnos" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
 
   <!-- Ciclo Escolar -->
   <div class="card">
@@ -2849,6 +2868,146 @@ let _cuadernosListenerRef = null;
 let _cuadernosListenerCB = null;
 let _fbListo = false;
 
+// Códigos de acceso (PIN) por alumno — del ciclo escolar completo, no depende del bimestre.
+// {alumnoId: "1234", ...}
+function getPinesAlumnos(){ return JSON.parse(localStorage.getItem('pines_alumnos')||'{}'); }
+function setPinesAlumnos(d){
+  localStorage.setItem('pines_alumnos', JSON.stringify(d));
+  db.ref('pines_alumnos').set(d).catch(e=>console.error('Error guardando pines:',e));
+}
+let _pinesIniciado = false;
+function initPinesFirebase(){
+  if(_pinesIniciado) return;
+  _pinesIniciado = true;
+  db.ref('pines_alumnos').on('value', snap=>{
+    const data = snap.val() || {};
+    localStorage.setItem('pines_alumnos', JSON.stringify(data));
+    if(panelActivo==='config') renderListaPines();
+  });
+}
+
+function generarPinAleatorio(){
+  return String(Math.floor(1000 + Math.random()*9000));
+}
+
+function generarPinesFaltantes(){
+  const pines = getPinesAlumnos();
+  let creados = 0;
+  ALUMNOS.forEach(a=>{
+    if(!pines[a.id]){ pines[a.id] = generarPinAleatorio(); creados++; }
+  });
+  setPinesAlumnos(pines);
+  renderListaPines();
+  mostrarAl('config-pines', creados>0 ? `✅ Se generaron ${creados} código(s) nuevo(s).` : 'Todos los alumnos ya tenían un código.', 'ok');
+}
+
+function regenerarTodosLosPines(){
+  if(!confirm('¿Seguro que quieres generar códigos NUEVOS para los 32 alumnos? Los códigos anteriores dejarán de funcionar, así que tendrás que volver a compartirlos con todas las familias.')) return;
+  const pines = {};
+  ALUMNOS.forEach(a=>{ pines[a.id] = generarPinAleatorio(); });
+  setPinesAlumnos(pines);
+  ALUMNOS.forEach(a=> sessionStorage.removeItem('pin_ok_'+a.id));
+  renderListaPines();
+  mostrarAl('config-pines', '🔄 Se generaron códigos nuevos para los 32 alumnos.', 'ok');
+}
+
+function regenerarUnPin(alId){
+  const pines = getPinesAlumnos();
+  pines[alId] = generarPinAleatorio();
+  setPinesAlumnos(pines);
+  sessionStorage.removeItem('pin_ok_'+alId);
+  renderListaPines();
+}
+
+function renderListaPines(){
+  const cont = document.getElementById('lista-pines-alumnos');
+  if(!cont) return;
+  const pines = getPinesAlumnos();
+  cont.innerHTML = ALUMNOS.map((a,idx)=>{
+    const pin = pines[a.id];
+    const bg = idx%2===0 ? '#fafafa' : '#fff';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${bg};border-radius:10px;flex-wrap:wrap">
+      <span style="font-size:1.2rem">${a.em}</span>
+      <span style="font-weight:700;flex:1;min-width:160px">${a.n}</span>
+      ${pin
+        ? `<span style="font-family:monospace;font-size:1.05rem;font-weight:800;letter-spacing:3px;background:#f3e5f5;color:#6a1b9a;padding:4px 12px;border-radius:8px">${pin}</span>
+           <button onclick="copiarPinAlumno(${a.id})" class="btn bgr" style="padding:5px 10px;font-size:.72rem">📋 Copiar</button>
+           <button onclick="regenerarUnPin(${a.id})" class="btn bgr" style="padding:5px 10px;font-size:.72rem">🔄 Nuevo</button>`
+        : `<span style="color:#999;font-size:.8rem;flex:0 0 auto">Sin código</span>`
+      }
+    </div>`;
+  }).join('');
+}
+
+function copiarPinAlumno(alId){
+  const a = ALUMNOS.find(x=>x.id===alId);
+  const pines = getPinesAlumnos();
+  const pin = pines[alId];
+  if(!a || !pin) return;
+  const texto = `Código de acceso para ver la información de ${a.n} (avatar ${a.em} ${a.av}) en el sistema del 5to grado: ${pin}\nGuardalo en privado, no lo compartas.`;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).then(()=>{
+      mostrarAl('config-pines', `📋 Copiado el código de ${a.n}.`, 'ok');
+    }).catch(()=>{ alert(texto); });
+  } else {
+    alert(texto);
+  }
+}
+
+// Verifica si ya hay acceso desbloqueado en este dispositivo/sesión para el alumno indicado;
+// si no, pide el código de 4 dígitos antes de mostrar cualquier información suya.
+// Interruptor del candado de códigos: false = cualquier padre entra directo al avatar (sin código).
+// Para volver a activarlo el próximo año, cambiar false por true.
+const REQUIERE_PIN_PADRES = false;
+
+function accederConPin(alId, callbackExito){
+  if(!REQUIERE_PIN_PADRES){ callbackExito(); return; }
+  if(sessionStorage.getItem('pin_ok_'+alId)==='1'){ callbackExito(); return; }
+  const pines = getPinesAlumnos();
+  const pinReal = pines[alId];
+  if(!pinReal){
+    alert('Este avatar todavía no tiene un código de acceso configurado. Pedile al maestro que lo genere en Configuración.');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-pin-alumno';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:26px;max-width:320px;width:100%;text-align:center;font-family:'Baloo 2',cursive">
+      <div style="font-size:2rem;margin-bottom:6px">🔒</div>
+      <div style="font-weight:800;color:#333;margin-bottom:4px">Código de acceso</div>
+      <div style="font-size:.8rem;color:#777;margin-bottom:14px">Pedile al maestro el código de 4 dígitos de tu hijo/a para ver su información.</div>
+      <input type="text" inputmode="numeric" maxlength="4" id="input-pin-alumno" placeholder="••••" autocomplete="off"
+        style="width:100%;padding:12px;font-size:1.4rem;letter-spacing:10px;text-align:center;border-radius:10px;border:2px solid #dde3ea;box-sizing:border-box;margin-bottom:10px;font-family:monospace">
+      <div id="error-pin-alumno" style="color:#c62828;font-size:.78rem;min-height:18px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <button id="btn-cancelar-pin" style="flex:1;padding:10px;border-radius:10px;border:none;background:#eee;color:#555;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Cancelar</button>
+        <button id="btn-confirmar-pin" style="flex:1;padding:10px;border-radius:10px;border:none;background:#1976d2;color:#fff;font-weight:700;cursor:pointer;font-family:'Baloo 2',cursive">Entrar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const input = document.getElementById('input-pin-alumno');
+  setTimeout(()=>input.focus(), 50);
+
+  const cerrar = ()=>{ if(document.body.contains(overlay)) document.body.removeChild(overlay); };
+  const intentar = ()=>{
+    if(input.value.trim() === String(pinReal)){
+      sessionStorage.setItem('pin_ok_'+alId, '1');
+      cerrar();
+      callbackExito();
+    } else {
+      document.getElementById('error-pin-alumno').textContent = '❌ Código incorrecto, intentá de nuevo.';
+      input.value=''; input.focus();
+    }
+  };
+  document.getElementById('btn-confirmar-pin').onclick = intentar;
+  document.getElementById('btn-cancelar-pin').onclick = cerrar;
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') intentar(); });
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) cerrar(); });
+}
+
 function getCuadernos(){ return _cuadernos; }
 
 function setCuadernos(d){
@@ -2930,6 +3089,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   renderBimGrid();
   initPromediosFirebase();
   initAsistenciaFirebase(); // asistencia es del ciclo completo, se activa desde ya sin depender del bimestre
+  initPinesFirebase(); // códigos de acceso de padres, igual que asistencia, del ciclo completo
   initConocimientosFirebase(); // igual que asistencia, el cuaderno de conocimientos es del ciclo completo
   actualizarAnioDisplay();
 
@@ -2977,7 +3137,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     const d=document.createElement('div');
     d.className='av-card'; d.dataset.id=a.id;
     d.innerHTML=`<span class="em">${a.em}</span><span class="nm">${a.av}</span>`;
-    d.onclick=()=>verDetalleAlumno(a.id);
+    d.onclick=()=>accederConPin(a.id, ()=>verDetalleAlumno(a.id));
     ag.appendChild(d);
   });
 
@@ -4671,7 +4831,7 @@ function initSubirTarea(){
       d.className = 'av-card';
       d.dataset.id = a.id;
       d.innerHTML = `<span class="em">${a.em}</span><span class="nm">${a.av}</span>`;
-      d.onclick = ()=>seleccionarAlumnoSubirTarea(a.id, d);
+      d.onclick = ()=>accederConPin(a.id, ()=>seleccionarAlumnoSubirTarea(a.id, d));
       ag.appendChild(d);
     });
     ag.dataset.armado = '1';
@@ -4689,8 +4849,14 @@ function reiniciarSubirTarea(){
   const preview = document.getElementById('subir-preview'); if(preview) preview.innerHTML='';
   const btnEnv = document.getElementById('subir-btn-enviar'); if(btnEnv) btnEnv.style.display='none';
   const inpFoto = document.getElementById('subir-input-foto'); if(inpFoto){ inpFoto.value=''; inpFoto.style.display='block'; }
-  const estEnv = document.getElementById('subir-estado-envio'); if(estEnv){ estEnv.style.display='none'; estEnv.innerHTML=''; }
+  const estEnv = document.getElementById('subir-estado-envio');
+  if(estEnv){
+    estEnv.style.display='none'; estEnv.innerHTML='';
+    estEnv.style.background='#fff8e1'; estEnv.style.borderLeftColor='#ffa726'; estEnv.style.color='#7a5200';
+  }
   const avisoRe = document.getElementById('subir-aviso-reemplazo'); if(avisoRe){ avisoRe.style.display='none'; avisoRe.innerHTML=''; }
+  const diag = document.getElementById('subir-diagnostico'); if(diag){ diag.style.display='none'; diag.textContent=''; }
+  const entAct = document.getElementById('subir-entrega-actual'); if(entAct){ entAct.style.display='none'; entAct.innerHTML=''; }
   _enviandoTarea = false;
   if(btnEnv){ btnEnv.disabled=false; btnEnv.textContent='📤 Enviar Tarea'; }
 }
@@ -4715,9 +4881,49 @@ function seleccionarAlumnoSubirTarea(alId, card){
   document.getElementById('subir-paso4').style.display = 'none';
 }
 
+// Lee DIRECTO de Firebase (sin usar ninguna copia local guardada en el dispositivo) para
+// confirmar con certeza si la tarea de este alumno en esta materia realmente se guardó.
+function verificarEnFirebaseDirecto(){
+  const { materia, alumnoId } = _subirTarea;
+  const cont = document.getElementById('subir-diagnostico');
+  if(!cont) return;
+  if(!materia || alumnoId===null){
+    alert('Primero elegí el alumno y la materia (pasos 1 y 2).');
+    return;
+  }
+  if(!bimestreActivo){
+    alert('No hay un bimestre activo en este momento.');
+    return;
+  }
+  cont.style.display = 'block';
+  cont.textContent = '🔄 Consultando directamente en la base de datos (Firebase), sin usar ninguna copia guardada en este dispositivo...';
+
+  const path = `tareasfotos_${bimestreActivo}/${materia}`;
+  db.ref(path).once('value').then(snap=>{
+    const data = snap.val() || {};
+    const entradas = Object.keys(data).filter(actIdx => data[actIdx] && data[actIdx][alumnoId]);
+    if(entradas.length===0){
+      cont.textContent = `❌ NO hay ninguna tarea guardada en la base de datos para este alumno en "${materia}" (bimestre ${bimestreActivo}).\n\nSi el alumno vio la pantalla verde de "¡Tarea enviada!" y aun así no está acá, puede que:\n• La haya subido en otra materia, otro alumno, o antes de cambiar de bimestre, por error.\n• Haya un problema de permisos en Firebase (avisale al maestro con este mensaje).`;
+    } else {
+      let txt = `✅ SÍ hay datos guardados en la base de datos para este alumno en "${materia}":\n\n`;
+      entradas.forEach(actIdx=>{
+        const reg = data[actIdx][alumnoId];
+        const cantFotos = reg.fotos ? reg.fotos.length : (reg.foto ? 1 : 0);
+        const fecha = reg.fecha ? new Date(reg.fecha).toLocaleString('es-GT') : '(sin fecha)';
+        txt += `• Actividad número ${actIdx}: ${cantFotos} foto(s), enviada el ${fecha}${reg.rechazada ? ' — marcada como RECHAZADA' : ''}\n`;
+      });
+      txt += `\nSi en la lista de arriba esa actividad NO aparece como "Enviada", es porque el número de actividad ya no coincide con la lista actual (por ejemplo, si se borró o se reordenó una actividad). Avisale al maestro y mandale este mensaje.`;
+      cont.textContent = txt;
+    }
+  }).catch(e=>{
+    cont.textContent = `❌ Error al consultar la base de datos: ${e.message}\n\nSi dice "permission" o "PERMISSION_DENIED", es un problema de configuración de Firebase — avisale al maestro.`;
+  });
+}
+
 function seleccionarMateriaSubirTarea(mat, btn){
   _subirTarea.materia = mat;
   _subirTarea.actIndex = null;
+  const diag = document.getElementById('subir-diagnostico'); if(diag){ diag.style.display='none'; diag.textContent=''; }
   document.querySelectorAll('#subir-mat-sel button').forEach(b=>b.classList.remove('bv'));
   document.querySelectorAll('#subir-mat-sel button').forEach(b=>b.classList.add('bgr'));
   if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
@@ -4784,6 +4990,52 @@ function seleccionarActividadSubirTarea(indice, btn){
   document.querySelectorAll('#subir-act-sel button').forEach(b=>{ b.classList.remove('bv'); b.classList.add('bgr'); });
   if(btn){ btn.classList.remove('bgr'); btn.classList.add('bv'); }
   document.getElementById('subir-paso4').style.display = 'block';
+  renderEntregaActual();
+}
+
+// Muestra lo que el alumno YA envió en la actividad elegida, con opción de eliminarlo
+// (por si tomó la foto equivocada). Si el maestro ya le puso nota, no se puede eliminar.
+function renderEntregaActual(){
+  const cont = document.getElementById('subir-entrega-actual');
+  if(!cont) return;
+  const { materia, alumnoId, actIndex } = _subirTarea;
+  const reg = getTareasFotos()?.[materia]?.[actIndex]?.[alumnoId];
+  const fotos = reg ? (reg.fotos || (reg.foto ? [reg.foto] : [])) : [];
+  if(fotos.length===0){ cont.style.display='none'; cont.innerHTML=''; return; }
+
+  const notaRaw = getCuadernos()?.[materia]?.notas?.[`${alumnoId}_${actIndex}`];
+  const nota = getNota(notaRaw);
+  const calificada = (nota!==null && nota!==undefined && nota!=='');
+
+  const miniaturas = fotos.map(f=>`<img src="${f}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.2)">`).join('');
+  cont.style.display = 'block';
+  cont.innerHTML = `<div style="background:#fff;border:2px solid #90caf9;border-radius:12px;padding:12px">
+    <div style="font-weight:800;font-size:.85rem;color:#0d47a1;margin-bottom:8px">📎 Lo que ya enviaste (${fotos.length} foto${fotos.length>1?'s':''})</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${miniaturas}</div>
+    ${calificada
+      ? `<div style="font-size:.78rem;color:#7a5200;background:#fff8e1;border-radius:8px;padding:8px 10px">🔒 Esta tarea ya fue calificada (${nota}), por eso no se puede eliminar. Si hubo un error, avisale al maestro.</div>`
+      : `<button type="button" onclick="eliminarMiEntrega()" class="btn" style="background:#c62828;color:#fff;padding:8px 14px;font-size:.78rem">🗑️ Eliminar lo que envié</button>
+         <div style="font-size:.72rem;color:#666;margin-top:6px">Si te equivocaste de foto, eliminala y subí la correcta.</div>`}
+  </div>`;
+}
+
+function eliminarMiEntrega(){
+  const { materia, alumnoId, actIndex } = _subirTarea;
+  if(!materia || alumnoId===null || actIndex===null) return;
+  if(!confirm('¿Seguro que querés eliminar lo que enviaste en esta actividad? Después podés subir la foto correcta.')) return;
+  const ruta = `tareasfotos_${bimestreActivo}/${materia}/${actIndex}/${alumnoId}`;
+  db.ref(ruta).remove().then(()=>{
+    if(_tareasFotos?.[materia]?.[actIndex]) delete _tareasFotos[materia][actIndex][alumnoId];
+    // refrescar etiquetas de la lista y quedarse en la misma actividad
+    const idx = actIndex;
+    seleccionarMateriaSubirTarea(materia, null);
+    const botones = document.querySelectorAll('#subir-act-sel button');
+    seleccionarActividadSubirTarea(idx, botones[idx]);
+    alert('✅ Listo, se eliminó. Ya podés subir la foto correcta.');
+  }).catch(e=>{
+    alert('No se pudo eliminar. Revisá tu conexión e intentá de nuevo.\n\nDetalle: ' + (e && e.message ? e.message : e));
+    console.error(e);
+  });
 }
 
 function previsualizarFotoTarea(event){
@@ -4909,12 +5161,20 @@ function enviarFotoTarea(){
     terminado = true; clearTimeout(timer);
     _enviandoTarea = false;
     estado.style.display = 'none';
+    // Actualizar de inmediato la copia local (sin esperar al aviso de Firebase, que puede
+    // tardar un instante) para que si el padre vuelve a revisar ya se vea como "Enviada".
+    if(!_tareasFotos[materia]) _tareasFotos[materia] = {};
+    if(!_tareasFotos[materia][actIndex]) _tareasFotos[materia][actIndex] = {};
+    _tareasFotos[materia][actIndex][alumnoId] = { fotos: fotos, fecha: Date.now() };
     ['subir-paso1','subir-paso2','subir-paso3','subir-paso4'].forEach(id=>{ document.getElementById(id).style.display='none'; });
     document.getElementById('subir-confirmacion').style.display = 'block';
   }).catch(e=>{
     terminado = true; clearTimeout(timer); restaurar();
-    estado.style.display = 'none';
-    alert('No se pudo enviar la tarea.\n\nDetalle técnico: ' + (e && e.message ? e.message : e) + '\n\nSi el mensaje dice "permission" o "PERMISSION_DENIED", avisale al maestro.');
+    estado.style.display = 'block';
+    estado.style.background = '#ffebee';
+    estado.style.borderLeftColor = '#c62828';
+    estado.style.color = '#b71c1c';
+    estado.innerHTML = `❌ <strong>No se pudo enviar la tarea.</strong><br>Detalle técnico: ${e && e.message ? e.message : e}<br><br>${(e&&e.message&&/permission/i.test(e.message))?'Este mensaje dice "permission" — avisale al maestro, es un tema de configuración, no tuyo.':'Revisá tu conexión a internet e intentá de nuevo.'}`;
     console.error(e);
   });
 }
@@ -5588,6 +5848,7 @@ function getPromedioGeneral(alId){
 function getAnio(){ return localStorage.getItem('ciclo_escolar') || new Date().getFullYear().toString(); }
 
 function initConfig(){
+  renderListaPines();
   const inp = document.getElementById('inp-anio');
   if(inp) inp.value = getAnio();
   // Limpiar checkboxes
