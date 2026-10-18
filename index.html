@@ -2720,8 +2720,7 @@ function initTareasFotosFirebase(){
   const ref = db.ref(`tareasfotos_${miBim}`);
   const callback = snap=>{
     const data = snap.val() || {};
-    // Las fotografías pueden superar la cuota de localStorage en móviles.
-    // No guardar copias Base64 aquí: Firebase es la fuente compartida.
+    localStorage.setItem(`tareasfotos_${miBim}`, JSON.stringify(data));
     // Solo actualizar lo que se ve en pantalla si el usuario sigue en ESTE MISMO bimestre;
     // si ya navegó a otro, esta actualización llegó tarde y no debe pisar lo que se ve ahora.
     if(miBim === bimestreActivo){
@@ -5226,12 +5225,8 @@ function enviarFotoTarea(){
 
   // Confirmación mediante lectura nueva del servidor: nunca confiar solo en el guardado local.
   promesa.then(async ()=>{
-    // Lectura HTTP independiente: evita confirmar una copia de caché del SDK.
-    const url = firebaseConfig.databaseURL.replace(/\\/$/, '') + '/' +
-      path.split('/').map(encodeURIComponent).join('/') + '.json?nocache=' + Date.now();
-    const respuesta = await fetch(url, {cache:'no-store'});
-    if(!respuesta.ok) throw new Error('No se pudo verificar en el servidor (HTTP ' + respuesta.status + ').');
-    const recibido = await respuesta.json();
+    const snap = await db.ref(path).once('value');
+    const recibido = snap.val();
     if(!recibido || recibido.identificadorEnvio !== identificadorEnvio ||
        !Array.isArray(recibido.fotos) || recibido.fotos.length !== fotos.length){
       throw new Error('Firebase no confirmó las fotografías de esta entrega.');
