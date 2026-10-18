@@ -1223,6 +1223,10 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 .pnm-celda{display:inline-block;min-width:36px;height:28px;line-height:28px;padding:0 4px;border-radius:6px;text-align:center;font-size:.82rem;cursor:pointer;border:1.5px solid #dde3ea;font-weight:700;background:#fff3e0;color:#e65100}
 .pnm-celda.con-nota{background:#e8f5e9;color:#2e7d32;border-color:#81c784}
 .pnm-celda.activa{border-color:#1565c0 !important;background:#e3f2fd !important;color:#1565c0 !important}
+
+/* Reparación visual acotada: menú de GitHub Pages. */
+@media(max-width:540px){.menu-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}}
+.menu-grid>.menu-btn{width:100%;box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -1274,56 +1278,56 @@ table.bnotas tr:nth-child(even) td, table.bval tr:nth-child(even) td {
 <div id="app-principal" style="display:none">
 
 <!-- GRID DE BOTONES CUADRADOS -->
-<div class="menu-grid">
-  <button class="menu-btn mb-rank" onclick="abrirPanel('rank',this)">
+<div class="menu-grid" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px;max-width:860px;margin:0 auto;align-items:stretch">
+  <button class="menu-btn mb-rank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanel('rank',this)">
     <span class="m-ico">🏆</span>
     <span class="m-tit">Ranking</span>
   </button>
-  <button class="menu-btn" style="background:linear-gradient(145deg,#a66a00,#e6ac22)" onclick="abrirCuadroHonorDirecto(this)">
+  <button class="menu-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;background:linear-gradient(145deg,#a66a00,#e6ac22)" onclick="abrirCuadroHonorProtegido(this)">
     <span class="m-ico">🏆</span>
     <span class="m-tit">Cuadro de Honor</span>
   </button>
-  <button class="menu-btn mb-cuad" onclick="abrirPanelPass('cuad',this)">
+  <button class="menu-btn mb-cuad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('cuad',this)">
     <span class="m-ico">📓</span>
     <span class="m-tit">Cuaderno de Registro</span>
   </button>
-  <button class="menu-btn mb-pad" onclick="abrirPanel('pad',this)">
+  <button class="menu-btn mb-pad" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanel('pad',this)">
     <span class="m-ico">👨‍👩‍👧</span>
     <span class="m-tit">Vista Padres</span>
   </button>
-  <button class="menu-btn" style="background:linear-gradient(145deg,#00695c,#00897b)" onclick="abrirPanel('repac',this)">
+  <button class="menu-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;background:linear-gradient(145deg,#00695c,#00897b)" onclick="abrirPanel('repac',this)">
     <span class="m-ico">📂</span>
     <span class="m-tit">Reporte Académico</span>
   </button>
-  <button class="menu-btn" style="background:linear-gradient(145deg,#c2185b,#e91e63)" onclick="abrirPanel('subir',this)">
+  <button class="menu-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;background:linear-gradient(145deg,#c2185b,#e91e63)" onclick="abrirPanel('subir',this)">
     <span class="m-ico">📤</span>
     <span class="m-tit">Subir Tarea (Padres)</span>
   </button>
-  <button class="menu-btn mb-reg" onclick="abrirPanelPass('reg',this)">
+  <button class="menu-btn mb-reg" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('reg',this)">
     <span class="m-ico">🔒</span>
     <span class="m-tit">Registro Interno</span>
   </button>
-  <button class="menu-btn mb-impr" onclick="abrirPanelPass('impr',this)">
+  <button class="menu-btn mb-impr" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('impr',this)">
     <span class="m-ico">🖨️</span>
     <span class="m-tit">Imprimir</span>
   </button>
-  <button class="menu-btn mb-bol" onclick="abrirPanelPass('bol',this)">
+  <button class="menu-btn mb-bol" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('bol',this)">
     <span class="m-ico">📋</span>
     <span class="m-tit">Boleta de Calificaciones</span>
   </button>
-  <button class="menu-btn mb-rep" onclick="abrirPanelPass('rep',this)">
+  <button class="menu-btn mb-rep" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('rep',this)">
     <span class="m-ico">⚠️</span>
     <span class="m-tit">Reporte Disciplinario</span>
   </button>
-  <button class="menu-btn mb-cond" onclick="abrirPanelPass('cond',this)">
+  <button class="menu-btn mb-cond" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer" onclick="abrirPanelPass('cond',this)">
     <span class="m-ico">🌟</span>
     <span class="m-tit">Evaluación de Conducta</span>
   </button>
-  <button class="menu-btn" style="background:linear-gradient(145deg,#1b5e20,#43a047)" onclick="abrirPanelPass('recon',this)">
+  <button class="menu-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;background:linear-gradient(145deg,#1b5e20,#43a047)" onclick="abrirPanelPass('recon',this)">
     <span class="m-ico">⭐</span>
     <span class="m-tit">Reconocimientos</span>
   </button>
-  <button class="menu-btn" style="background:linear-gradient(145deg,#263238,#455a64)" onclick="abrirPanelPass('config',this)">
+  <button class="menu-btn" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 10px;border:0;border-radius:18px;color:white;font-weight:800;min-height:110px;cursor:pointer;background:linear-gradient(145deg,#263238,#455a64)" onclick="abrirPanelPass('config',this)">
     <span class="m-ico">⚙️</span>
     <span class="m-tit">Configuración</span>
   </button>
@@ -2788,7 +2792,7 @@ function seleccionarBimestre(bimId){
   initTareasFotosFirebase();
   // Mostrar menú de botones
   const grid = document.querySelector('.menu-grid');
-  if(grid) grid.style.display='grid';
+  if(grid){ grid.style.display='grid'; grid.style.gridTemplateColumns = window.matchMedia('(max-width: 540px)').matches ? 'repeat(2,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))'; }
   cerrarPanel();
 }
 
@@ -7260,6 +7264,7 @@ function abrirCuadroHonorProtegido(btn){
 }
 
 function abrirCuadroHonorDirecto(btn){
+  if(!sesionDesbloqueada){ pedirPassGenerico('honor', btn); return; }
   if(panelActivo !== 'bol') abrirPanel('bol',btn);
   const titulo=document.getElementById('menu-panel-titulo');
   if(titulo) titulo.textContent='🏆 Cuadro de Honor';
